@@ -33,14 +33,17 @@ import {
   ZoomOut,
   RotateCcw,
   Sliders,
-  GripVertical
+  GripVertical,
+  CheckCircle2
 } from 'lucide-react';
 import { ASN_KUA_GERUNG } from '../data/speakersData';
 import { formatIndonesianFullDate, getIndonesianDateDetails } from '../utils/formatters';
-import { StreamLayout, StudioParticipantProfile, PipPosition, CameraPanOffset, PrimaryCameraRole } from '../types/studio';
+import { StreamLayout, StudioParticipantProfile, PipPosition, CameraPanOffset, PrimaryCameraRole, LowerThirdPosition } from '../types/studio';
 import { StudioLayoutBar } from './studio/StudioLayoutBar';
 import { DualCameraStage } from './studio/DualCameraStage';
 import { createVirtualHostStudio, createVirtualGuestStudio, drawCompositeFrame } from '../utils/studioCanvas';
+import { saveBroadcastEpisode, getAllEpisodes } from '../utils/broadcastArchive';
+import { Episode } from '../types';
 
 interface LiveCameraStudioModalProps {
   isOpen: boolean;
@@ -83,8 +86,8 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   const [selectedVideoDeviceIdGuest, setSelectedVideoDeviceIdGuest] = useState<string>('');
   const [selectedAudioDeviceId, setSelectedAudioDeviceId] = useState<string>('');
 
-  // Layout Mode & Camera 2 Repositioning States
-  const [streamLayout, setStreamLayout] = useState<StreamLayout>('split');
+  // Layout Mode & Camera 2 Repositioning States (Default: 'pip' - Layar Tunggal PiP)
+  const [streamLayout, setStreamLayout] = useState<StreamLayout>('pip');
   const [splitRatio, setSplitRatio] = useState<number>(50); // Split Screen divider ratio (20% - 80%)
   const [pipPosition, setPipPosition] = useState<PipPosition>({
     x: 66,
@@ -97,6 +100,10 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
     zoom: 1
   }); // Camera 2 framing & angle offset
 
+  // Draggable Banner Positions for Host & Narasumber (Bisa digeser ke mana saja)
+  const [hostBannerPos, setHostBannerPos] = useState<LowerThirdPosition>({ x: 3, y: 76 });
+  const [guestBannerPos, setGuestBannerPos] = useState<LowerThirdPosition>({ x: 50, y: 76 });
+
   // Primary Camera Role: 'guest' (Narasumber di kamera utama) | 'host' (Host di kamera utama)
   const [primaryRole, setPrimaryRole] = useState<PrimaryCameraRole>('guest');
 
@@ -106,6 +113,8 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   const pipPositionRef = useRef<PipPosition>(pipPosition);
   const guestPanRef = useRef<CameraPanOffset>(guestPan);
   const primaryRoleRef = useRef<PrimaryCameraRole>(primaryRole);
+  const hostBannerPosRef = useRef<LowerThirdPosition>(hostBannerPos);
+  const guestBannerPosRef = useRef<LowerThirdPosition>(guestBannerPos);
 
   useEffect(() => {
     streamLayoutRef.current = streamLayout;
@@ -126,6 +135,19 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   useEffect(() => {
     primaryRoleRef.current = primaryRole;
   }, [primaryRole]);
+
+  useEffect(() => {
+    hostBannerPosRef.current = hostBannerPos;
+  }, [hostBannerPos]);
+
+  useEffect(() => {
+    guestBannerPosRef.current = guestBannerPos;
+  }, [guestBannerPos]);
+
+  const resetBannerPositions = useCallback(() => {
+    setHostBannerPos({ x: 3, y: 76 });
+    setGuestBannerPos({ x: 50, y: 76 });
+  }, []);
 
   // Camera 1 (Host) Controls
   const [isHostVideoEnabled, setIsHostVideoEnabled] = useState<boolean>(true);
@@ -177,6 +199,8 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   const [recordedBlobUrl, setRecordedBlobUrl] = useState<string | null>(null);
   const [recordedBlobSize, setRecordedBlobSize] = useState<number>(0);
   const [snapshotSuccess, setSnapshotSuccess] = useState<boolean>(false);
+  const [lastSavedEpisode, setLastSavedEpisode] = useState<Episode | null>(null);
+  const [isAutoSavedNotice, setIsAutoSavedNotice] = useState<boolean>(false);
 
   // Status & Audio meter
   const [audioLevel, setAudioLevel] = useState<number>(0);
@@ -228,9 +252,22 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
       devices.forEach((device) => {
         if (device.kind === 'videoinput') {
           const isExt = isExternalDevice(device.label);
+          const lower = (device.label || '').toLowerCase();
+          const isFront = lower.includes('front') || lower.includes('user') || lower.includes('depan');
+          const isBack = lower.includes('back') || lower.includes('rear') || lower.includes('environment') || lower.includes('belakang');
+
+          let friendlyLabel = device.label;
+          if (!friendlyLabel) {
+            friendlyLabel = `Kamera ${vidCount++} ${isExt ? '(Eksternal/USB)' : '(Bawaan Laptop/HP)'}`;
+          } else if (isFront) {
+            friendlyLabel = `🤳 Kamera Depan HP (${device.label})`;
+          } else if (isBack) {
+            friendlyLabel = `📱 Kamera Belakang HP (${device.label})`;
+          }
+
           vInputs.push({
             deviceId: device.deviceId,
-            label: device.label || `Kamera ${vidCount++} ${isExt ? '(Eksternal/USB)' : '(Bawaan Laptop/PC)'}`,
+            label: friendlyLabel,
             kind: 'videoinput',
             isExternal: isExt
           });
@@ -338,12 +375,12 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
     }
   };
 
-  // Derived profiles
+  // Derived profiles (Tanpa nomor/teks ASN sesuai permintaan)
   const currentHostAsn = ASN_KUA_GERUNG[hostAsnIndex] || ASN_KUA_GERUNG[0];
   const hostProfile: StudioParticipantProfile = {
     name: hostCustomName.trim() || currentHostAsn.name,
     title: hostCustomTitle.trim() || currentHostAsn.jabatan,
-    asnNo: !hostCustomName.trim() ? currentHostAsn.no : undefined,
+    asnNo: undefined,
     role: 'host'
   };
 
@@ -351,7 +388,7 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   const guestProfile: StudioParticipantProfile = {
     name: guestCustomName.trim() || currentGuestAsn.name,
     title: guestCustomTitle.trim() || currentGuestAsn.jabatan,
-    asnNo: !guestCustomName.trim() ? currentGuestAsn.no : undefined,
+    asnNo: undefined,
     role: 'narasumber'
   };
 
@@ -422,7 +459,11 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
         frameRate: { ideal: 30 }
       };
 
-      if (videoDevId && videoDevId !== 'same-as-host' && videoDevId !== 'simulated') {
+      if (videoDevId === 'mobile-front') {
+        videoConstraints.facingMode = { ideal: 'user' };
+      } else if (videoDevId === 'mobile-back') {
+        videoConstraints.facingMode = { ideal: 'environment' };
+      } else if (videoDevId && videoDevId !== 'same-as-host' && videoDevId !== 'simulated') {
         videoConstraints.deviceId = { exact: videoDevId };
       }
 
@@ -507,7 +548,11 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
         frameRate: { ideal: 30 }
       };
 
-      if (guestDevId && guestDevId !== 'simulated-guest') {
+      if (guestDevId === 'mobile-front') {
+        videoConstraints.facingMode = { ideal: 'user' };
+      } else if (guestDevId === 'mobile-back') {
+        videoConstraints.facingMode = { ideal: 'environment' };
+      } else if (guestDevId && guestDevId !== 'simulated-guest') {
         videoConstraints.deviceId = { exact: guestDevId };
       }
 
@@ -540,6 +585,45 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
 
     setIsLoadingCamera(false);
   }, [getConnectedDevices, startHostCamera, startGuestCamera, selectedVideoDeviceIdHost, selectedVideoDeviceIdGuest, selectedAudioDeviceId]);
+
+  // Support HP Dual Kamera (Depan-Belakang)
+  const enableMobileDualCameras = async () => {
+    setIsLoadingCamera(true);
+    setErrorMessage(null);
+    setSelectedVideoDeviceIdHost('mobile-front');
+    setSelectedVideoDeviceIdGuest('mobile-back');
+    setIsHostMirrored(true);
+    setIsGuestMirrored(false);
+
+    try {
+      await startHostCamera('mobile-front', selectedAudioDeviceId);
+      try {
+        await startGuestCamera('mobile-back');
+      } catch (guestErr) {
+        console.warn('Smartphone sensor hardware limit, cloning stream:', guestErr);
+        await startGuestCamera('same-as-host');
+        setErrorMessage('Sensor kamera smartphone aktif! Mode pintar menggunakan sudut framing independen jika browser membatasi 2 sensor aktif bersamaan.');
+      }
+    } catch (err) {
+      console.warn('Error enabling mobile dual cameras:', err);
+      setErrorMessage('Tidak dapat mengakses kamera smartphone. Mohon izinkan akses kamera di browser Anda.');
+    } finally {
+      setIsLoadingCamera(false);
+    }
+  };
+
+  const toggleMobileCameras = async () => {
+    setIsLoadingCamera(true);
+    const newHost = selectedVideoDeviceIdHost === 'mobile-front' ? 'mobile-back' : 'mobile-front';
+    const newGuest = selectedVideoDeviceIdGuest === 'mobile-back' ? 'mobile-front' : 'mobile-back';
+    setSelectedVideoDeviceIdHost(newHost);
+    setSelectedVideoDeviceIdGuest(newGuest);
+    setIsHostMirrored(newHost === 'mobile-front');
+    setIsGuestMirrored(newGuest === 'mobile-front');
+    await startHostCamera(newHost, selectedAudioDeviceId);
+    await startGuestCamera(newGuest);
+    setIsLoadingCamera(false);
+  };
 
   // Modal open lifecycle
   useEffect(() => {
@@ -632,7 +716,9 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
         splitRatioRef.current,
         pipPositionRef.current,
         guestPanRef.current,
-        primaryRoleRef.current
+        primaryRoleRef.current,
+        hostBannerPosRef.current,
+        guestBannerPosRef.current
       );
       compositeAnimRef.current = requestAnimationFrame(renderLoop);
     };
@@ -682,6 +768,60 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
         setRecordedBlobUrl(url);
         setRecordedBlobSize(fullBlob.size);
         setRecordingState('stopped');
+
+        // Otomatis Simpan Episode ke Arsip Episode Siaran
+        try {
+          let coverImage = 'https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=800&q=80';
+          if (compositeCanvasRef.current) {
+            try {
+              coverImage = compositeCanvasRef.current.toDataURL('image/jpeg', 0.85);
+            } catch (snapErr) {
+              console.warn('Canvas snapshot error:', snapErr);
+            }
+          }
+
+          const existingEpisodes = getAllEpisodes();
+          const maxEpNum = existingEpisodes.reduce((max, ep) => Math.max(max, ep.episodeNumber || 0), 0);
+          const durationMins = Math.max(1, Math.floor(recordDuration / 60));
+          const durationSecs = recordDuration % 60;
+          const durationFormatted = `${durationMins.toString().padStart(2, '0')}:${durationSecs.toString().padStart(2, '0')}`;
+
+          const newSavedEpisode: Episode = {
+            id: `ep-studio-${Date.now()}`,
+            episodeNumber: maxEpNum + 1,
+            title: podcastTopic.trim() || 'Siaran Studio KUA Kecamatan Gerung',
+            subtitle: `Dialog Studio KUA Gerung • Host: ${hostProfile.name} & Tamu: ${guestProfile.name}`,
+            category: 'spesial',
+            categoryLabel: 'Siaran Studio',
+            duration: durationFormatted,
+            durationSeconds: recordDuration || 60,
+            releaseDate: `${indonesianDate.dateNum} ${indonesianDate.monthName} ${indonesianDate.year}`,
+            audioUrl: url,
+            videoUrl: url,
+            coverImage,
+            description: `Episode rekaman siaran studio multi-kamera KUA Kecamatan Gerung. Membahas topik: "${podcastTopic}". Dipandu oleh ${hostProfile.name} (${hostProfile.title}) bersama narasumber ${guestProfile.name} (${guestProfile.title}).`,
+            keyPoints: [
+              `Siaran Studio Dual Kamera KUA Kecamatan Gerung`,
+              `Topik Bahasan: ${podcastTopic}`,
+              `Host: ${hostProfile.name} (${hostProfile.title})`,
+              `Narasumber: ${guestProfile.name} (${guestProfile.title})`,
+              `Waktu Siaran: ${indonesianDate.dayName}, ${indonesianDate.dateNum} ${indonesianDate.monthName} ${indonesianDate.year} pukul ${indonesianDate.timeString} WITA`,
+              `Tersimpan otomatis di Arsip Episode Siaran KUA`
+            ],
+            hostId: 'spk-marliadi',
+            speakerIds: ['spk-marliadi', 'spk-husni'],
+            listensCount: 1,
+            likesCount: 0,
+            featured: true,
+            isRecordedStudio: true
+          };
+
+          saveBroadcastEpisode(newSavedEpisode, fullBlob);
+          setLastSavedEpisode(newSavedEpisode);
+          setIsAutoSavedNotice(true);
+        } catch (saveErr) {
+          console.warn('Error auto-saving recording to archive:', saveErr);
+        }
       };
 
       recorder.start(1000);
@@ -753,7 +893,9 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
       splitRatio,
       pipPosition,
       guestPan,
-      primaryRole
+      primaryRole,
+      hostBannerPos,
+      guestBannerPos
     );
 
     const dataUrl = canvas.toDataURL('image/png');
@@ -825,7 +967,7 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
           </div>
         </div>
 
-        {/* Studio Layout Switcher Bar (Split 50:50, PiP, Solo Host, Solo Narasumber, Tukar) */}
+        {/* Studio Layout Switcher Bar (PiP Layar Tunggal, Solo Host, Solo Narasumber, Split 50:50, Tukar, Reset Nama) */}
         <StudioLayoutBar
           layout={streamLayout}
           onLayoutChange={setStreamLayout}
@@ -838,6 +980,7 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
           onPipPositionChange={setPipPosition}
           primaryRole={primaryRole}
           onPrimaryRoleChange={setPrimaryRole}
+          onResetBannerPositions={resetBannerPositions}
         />
 
         {/* Studio Main Body: Stage (Left 8 Cols) & Controls (Right 4 Cols) */}
@@ -884,6 +1027,10 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
               onSwapPositions={swapPositions}
               primaryRole={primaryRole}
               onPrimaryRoleChange={setPrimaryRole}
+              hostBannerPos={hostBannerPos}
+              onHostBannerPosChange={setHostBannerPos}
+              guestBannerPos={guestBannerPos}
+              onGuestBannerPosChange={setGuestBannerPos}
             />
 
             {/* Error / Simulation Notice if needed */}
@@ -988,9 +1135,9 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
 
             {/* Post-Recording Review Preview Card */}
             {recordedBlobUrl && recordingState === 'stopped' && (
-              <div className="mt-3 p-3.5 rounded-2xl bg-[#1a1d15] border border-[#D4AF37]/50 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="mt-3 p-4 rounded-2xl bg-gradient-to-r from-[#1a1d15] to-[#121c15] border border-emerald-500/50 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-20 h-14 bg-black rounded-lg overflow-hidden border border-white/20 shrink-0">
+                  <div className="w-24 h-16 bg-black rounded-xl overflow-hidden border border-emerald-500/40 shrink-0 shadow-md">
                     <video
                       ref={playbackVideoRef}
                       src={recordedBlobUrl}
@@ -999,23 +1146,43 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                     />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-emerald-400" />
-                      Video Rekaman Dual Camera Selesai!
+                    <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Episode Tersimpan Otomatis di Arsip Siaran!</span>
                     </h4>
-                    <p className="text-[11px] text-white/60">
-                      Format: Split Screen 50:50 &bull; Durasi: <span className="font-mono font-bold text-[#D4AF37]">{formatTimer(recordDuration)}</span> &bull; Ukuran: {(recordedBlobSize / (1024 * 1024)).toFixed(2)} MB
+                    <p className="text-[11px] text-white/70 mt-0.5">
+                      {lastSavedEpisode ? (
+                        <>Tersimpan sebagai <strong className="text-[#D4AF37]">Episode {lastSavedEpisode.episodeNumber}</strong> &bull; Durasi: <span className="font-mono font-bold text-[#D4AF37]">{formatTimer(recordDuration)}</span></>
+                      ) : (
+                        <>Format: Dual Camera &bull; Durasi: <span className="font-mono font-bold text-[#D4AF37]">{formatTimer(recordDuration)}</span></>
+                      )}
+                      &bull; {(recordedBlobSize / (1024 * 1024)).toFixed(2)} MB
+                    </p>
+                    <p className="text-[10px] text-emerald-400 font-medium mt-0.5">
+                      ✓ Video tersimpan di IndexedDB & siap diputar di katalog episode
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setTimeout(() => {
+                        const el = document.getElementById('episodes-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }, 150);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>Buka Arsip Siaran</span>
+                  </button>
                   <button
                     onClick={downloadRecording}
-                    className="px-3.5 py-1.5 rounded-xl bg-[#D4AF37] hover:bg-[#e0be48] text-black font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-xl bg-[#D4AF37] hover:bg-[#e0be48] text-black font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Simpan Video</span>
+                    <span>Unduh Video</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1024,7 +1191,7 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                     }}
                     className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold cursor-pointer"
                   >
-                    Rekam Ulang
+                    Rekam Baru
                   </button>
                 </div>
               </div>
@@ -1074,6 +1241,40 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
               {/* TAB 1: DUAL CAMERA & AUDIO SETTINGS */}
               {activeStudioTab === 'camera' && (
                 <div className="space-y-3.5">
+                  {/* Mode HP Dual Kamera (Depan & Belakang) */}
+                  <div className="p-3 rounded-2xl bg-gradient-to-r from-[#17231c] via-[#101b13] to-[#1a1708] border border-emerald-500/60 shadow-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Support HP Dual Kamera (Depan & Belakang)</span>
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                        Siap Pakai HP
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/80 leading-relaxed">
+                      Gunakan 1 HP untuk siaran langsung: Kamera depan otomatis menyorot <strong>Host</strong> dan kamera belakang menyorot <strong>Narasumber</strong>.
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={enableMobileDualCameras}
+                        className="py-1.5 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>Aktifkan Dual Cam HP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={toggleMobileCameras}
+                        className="py-1.5 px-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 border border-white/20 transition-all cursor-pointer"
+                      >
+                        <FlipHorizontal className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <span>Balik Depan ⇄ Belakang</span>
+                      </button>
+                    </div>
+                  </div>
+
                   {/* Penempatan Peran: Narasumber di Kamera Utama vs Host */}
                   <div className="p-3 rounded-2xl bg-gradient-to-r from-[#171408] to-[#0d160f] border border-[#D4AF37]/60 space-y-2">
                     <div className="flex items-center justify-between">
@@ -1133,9 +1334,11 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                       className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white focus:border-[#D4AF37] cursor-pointer"
                     >
                       <option value="simulated">✨ [Simulasi] Studio Virtual Host KUA</option>
+                      <option value="mobile-front">🤳 Kamera Depan HP (Selfie / Host)</option>
+                      <option value="mobile-back">📱 Kamera Belakang HP (Narasumber / Ruangan)</option>
                       {videoDevices.map((dev, idx) => (
                         <option key={dev.deviceId || idx} value={dev.deviceId}>
-                          {dev.isExternal ? '📹 [Eksternal/USB] ' : '💻 [Bawaan PC] '}
+                          {dev.isExternal ? '📹 [Eksternal/USB] ' : '💻 [Bawaan Perangkat] '}
                           {dev.label}
                         </option>
                       ))}
@@ -1171,6 +1374,8 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                       className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white focus:border-[#D4AF37] cursor-pointer"
                     >
                       <option value="same-as-host">🔁 Gunakan Kamera 1 (Sudut Alternatif / 1 Webcam)</option>
+                      <option value="mobile-back">📱 Kamera Belakang HP (Narasumber)</option>
+                      <option value="mobile-front">🤳 Kamera Depan HP (Host)</option>
                       <option value="simulated-guest">✨ [Simulasi] Studio Virtual Tamu / Narasumber</option>
                       {videoDevices.map((dev, idx) => (
                         <option key={dev.deviceId || idx} value={dev.deviceId}>
@@ -1180,7 +1385,7 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                       ))}
                     </select>
                     <p className="text-[10px] text-white/50">
-                      Mendukung 2 kamera fisik bersamaan (Webcam Laptop + USB Cam / CamLink / HP DroidCam).
+                      Mendukung 2 kamera fisik bersamaan (HP Dual Cam depan-belakang, Webcam Laptop + USB Cam / CamLink).
                     </p>
                   </div>
 

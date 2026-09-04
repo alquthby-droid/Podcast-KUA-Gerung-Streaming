@@ -37,6 +37,8 @@ export interface Episode {
   listensCount: number;
   likesCount: number;
   featured?: boolean;
+  videoUrl?: string;
+  isRecordedStudio?: boolean;
 }
 
 export interface CommentReply {

@@ -14,6 +14,7 @@ interface StudioLayoutBarProps {
   onPipPositionChange?: (pos: PipPosition) => void;
   primaryRole?: PrimaryCameraRole;
   onPrimaryRoleChange?: (role: PrimaryCameraRole) => void;
+  onResetBannerPositions?: () => void;
 }
 
 export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
@@ -27,34 +28,20 @@ export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
   pipPosition = { x: 68, y: 60, size: 'medium' },
   onPipPositionChange,
   primaryRole = 'guest',
-  onPrimaryRoleChange
+  onPrimaryRoleChange,
+  onResetBannerPositions
 }) => {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 p-2 bg-[#0E100A] border-b border-white/10 shrink-0">
       {/* Left: Mode Title & Layout Selectors */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-extrabold uppercase text-[#D4AF37] tracking-wider flex items-center gap-1.5">
-          <Columns2 className="w-3.5 h-3.5" />
-          <span>Format:</span>
+          <Layers className="w-3.5 h-3.5" />
+          <span>Format Layar:</span>
         </span>
 
-        {/* Center: Layout Buttons */}
+        {/* Center: Layout Buttons - Layar Tunggal PiP is First & Default */}
         <div className="flex items-center gap-1 sm:gap-1.5 bg-black/60 p-1 rounded-xl border border-white/10">
-          <button
-            type="button"
-            onClick={() => onLayoutChange('split')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              layout === 'split'
-                ? 'bg-[#006837] text-white shadow-md border border-emerald-400'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
-            }`}
-            title="Split: Host & Narasumber Berdampingan (Posisi pembatas bisa digeser)"
-          >
-            <Columns2 className="w-3.5 h-3.5 text-[#D4AF37]" />
-            <span className="hidden sm:inline">Split {splitRatio}:{100 - splitRatio}</span>
-            <span className="sm:hidden">Split</span>
-          </button>
-
           <button
             type="button"
             onClick={() => onLayoutChange('pip')}
@@ -63,10 +50,11 @@ export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
                 ? 'bg-[#006837] text-white shadow-md border border-emerald-400'
                 : 'text-white/60 hover:text-white hover:bg-white/5'
             }`}
-            title="Picture-in-Picture: Host Utama + Kotak Kamera 2 (Bisa digeser bebas)"
+            title="Layar Tunggal + PiP: Satu layar utama penuh dengan kotak kamera 2 mengambang (bisa digeser bebas)"
           >
             <Layers className="w-3.5 h-3.5 text-amber-300" />
-            <span>PiP</span>
+            <span className="hidden sm:inline">Layar Tunggal (PiP)</span>
+            <span className="sm:hidden">PiP</span>
           </button>
 
           <button
@@ -97,6 +85,21 @@ export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
             <User className="w-3.5 h-3.5 text-blue-300" />
             <span className="hidden md:inline">Solo Narasumber</span>
             <span className="md:hidden">Narasumber</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onLayoutChange('split')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+              layout === 'split'
+                ? 'bg-[#006837] text-white shadow-md border border-emerald-400'
+                : 'text-white/60 hover:text-white hover:bg-white/5'
+            }`}
+            title="Split 50:50: Dua kamera berdampingan"
+          >
+            <Columns2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span className="hidden sm:inline">Split 50:50</span>
+            <span className="sm:hidden">Split</span>
           </button>
         </div>
       </div>
@@ -188,6 +191,20 @@ export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
             ✛ Tengah
           </button>
         </div>
+      )}
+
+      {/* Reset Name Positions Button */}
+      {onResetBannerPositions && (
+        <button
+          type="button"
+          onClick={onResetBannerPositions}
+          className="px-2 py-1 rounded-lg bg-black/60 hover:bg-white/10 text-white/70 hover:text-white border border-white/10 text-[11px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+          title="Kembalikan posisi nama Host dan Narasumber ke posisi awal"
+        >
+          <Move className="w-3 h-3 text-[#D4AF37]" />
+          <span className="hidden sm:inline">Reset Posisi Nama</span>
+          <span className="sm:hidden">Reset Nama</span>
+        </button>
       )}
 
       {/* Right: Primary Role Status & Switcher */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AudioPlayerProvider } from './context/AudioPlayerContext';
 import { Navbar } from './components/Navbar';
 import { HeroBanner } from './components/HeroBanner';
@@ -13,9 +13,11 @@ import { EpisodeDetailModal } from './components/EpisodeDetailModal';
 import { SocialShareModal } from './components/SocialShareModal';
 import { LiveCameraStudioModal } from './components/LiveCameraStudioModal';
 import { EPISODES_DATA } from './data/episodesData';
+import { getAllEpisodes } from './utils/broadcastArchive';
 import { Episode, SpeakerRole } from './types';
 
 export function MainPodcastApp() {
+  const [allEpisodes, setAllEpisodes] = useState<Episode[]>(getAllEpisodes);
   const [activeTab, setActiveTab] = useState<string>('beranda');
   const [selectedEpisodeId, setSelectedEpisodeId] = useState<string | null>(null);
   const [isSocialShareOpen, setIsSocialShareOpen] = useState<boolean>(false);
@@ -23,7 +25,15 @@ export function MainPodcastApp() {
   const [episodeToShare, setEpisodeToShare] = useState<Episode | null>(null);
   const [targetSpeakerForQuestion, setTargetSpeakerForQuestion] = useState<SpeakerRole | 'semua'>('semua');
 
-  const selectedEpisode = EPISODES_DATA.find((e) => e.id === selectedEpisodeId) || null;
+  useEffect(() => {
+    const handleSync = () => {
+      setAllEpisodes(getAllEpisodes());
+    };
+    window.addEventListener('kua_broadcast_saved', handleSync);
+    return () => window.removeEventListener('kua_broadcast_saved', handleSync);
+  }, []);
+
+  const selectedEpisode = allEpisodes.find((e) => e.id === selectedEpisodeId) || null;
 
   const handleOpenEpisodeDetails = (id: string) => {
     setSelectedEpisodeId(id);
@@ -73,6 +83,7 @@ export function MainPodcastApp() {
 
         {/* 2. Episode Catalog with Filters & Search */}
         <EpisodeGrid
+          episodes={allEpisodes}
           onOpenEpisodeDetails={handleOpenEpisodeDetails}
           onShareEpisode={(ep) => handleOpenSocialShare(ep)}
           onScrollToComments={(epId) => handleScrollToComments(epId)}

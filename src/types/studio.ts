@@ -15,6 +15,11 @@ export interface PipPosition {
   size: 'small' | 'medium' | 'large'; // preset size
 }
 
+export interface LowerThirdPosition {
+  x: number; // percentage from left (0 - 100)
+  y: number; // percentage from top (0 - 100)
+}
+
 export interface CameraPanOffset {
   panX: number; // percentage shift (-50 to 50)
   panY: number; // percentage shift (-50 to 50)

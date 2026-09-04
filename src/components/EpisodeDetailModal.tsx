@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Play,
@@ -11,8 +11,11 @@ import {
   Users,
   Headphones,
   Award,
+  Download,
+  Video,
 } from 'lucide-react';
 import { Episode } from '../types';
+import { getVideoBlobFromIdb } from '../utils/broadcastArchive';
 import { SPEAKERS_DATA } from '../data/speakersData';
 import { useAudioPlayer } from '../context/AudioPlayerContext';
 
@@ -30,6 +33,20 @@ export const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
   onScrollToComments,
 }) => {
   const { currentEpisode, isPlaying, playEpisode, togglePlay } = useAudioPlayer();
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(episode?.videoUrl || null);
+
+  useEffect(() => {
+    if (!episode) return;
+    setResolvedVideoUrl(episode.videoUrl || null);
+    if (episode.isRecordedStudio) {
+      getVideoBlobFromIdb(episode.id).then((blob) => {
+        if (blob) {
+          const objectUrl = URL.createObjectURL(blob);
+          setResolvedVideoUrl(objectUrl);
+        }
+      });
+    }
+  }, [episode?.id, episode?.videoUrl, episode?.isRecordedStudio]);
 
   if (!episode) return null;
 
@@ -85,6 +102,36 @@ export const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
 
         {/* Modal Scrollable Body */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Studio Video Player (If Recorded Video Exists) */}
+          {resolvedVideoUrl && (
+            <div className="space-y-2 p-4 rounded-2xl bg-black/60 border border-[#D4AF37]/50 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white text-xs sm:text-sm flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                  <Video className="w-4 h-4 text-emerald-400" />
+                  <span>Video Siaran Studio KUA (Dual Camera)</span>
+                </span>
+                <a
+                  href={resolvedVideoUrl}
+                  download={`KUA_Gerung_Studio_${episode.id}.webm`}
+                  className="px-2.5 py-1 rounded-lg bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37] hover:text-black font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh Video</span>
+                </a>
+              </div>
+              <div className="rounded-xl overflow-hidden border border-white/10 bg-black aspect-video relative shadow-inner">
+                <video
+                  src={resolvedVideoUrl}
+                  controls
+                  playsInline
+                  poster={episode.coverImage}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          )}
+
           {/* Audio Action Banner */}
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-[#0F110C] border border-white/10">
             <div className="flex items-center gap-3">

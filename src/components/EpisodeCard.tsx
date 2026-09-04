@@ -52,13 +52,21 @@ export const EpisodeCard: React.FC<EpisodeCardProps> = ({
           <div className="absolute inset-0 bg-gradient-to-t from-[#161812] via-transparent to-black/40"></div>
 
           {/* Top badges */}
-          <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+          <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-1">
             <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-black/70 text-[#D4AF37] backdrop-blur-xs border border-[#D4AF37]/30">
               Episode {episode.episodeNumber}
             </span>
-            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white/90 backdrop-blur-xs border border-white/10">
-              {episode.categoryLabel}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {episode.isRecordedStudio && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-950/90 text-emerald-400 border border-emerald-500/50 flex items-center gap-1 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Siaran Studio</span>
+                </span>
+              )}
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-white/10 text-white/90 backdrop-blur-xs border border-white/10">
+                {episode.categoryLabel}
+              </span>
+            </div>
           </div>
 
           {/* Play/Pause Button overlay */}

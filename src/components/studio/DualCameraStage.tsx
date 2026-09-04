@@ -12,7 +12,7 @@ import {
   Move,
   GripVertical
 } from 'lucide-react';
-import { StreamLayout, StudioParticipantProfile, PipPosition, CameraPanOffset, PrimaryCameraRole } from '../../types/studio';
+import { StreamLayout, StudioParticipantProfile, PipPosition, CameraPanOffset, PrimaryCameraRole, LowerThirdPosition } from '../../types/studio';
 
 interface DualCameraStageProps {
   layout: StreamLayout;
@@ -61,6 +61,10 @@ interface DualCameraStageProps {
   onSwapPositions?: () => void;
   primaryRole?: PrimaryCameraRole;
   onPrimaryRoleChange?: (role: PrimaryCameraRole) => void;
+  hostBannerPos?: LowerThirdPosition;
+  onHostBannerPosChange?: (pos: LowerThirdPosition) => void;
+  guestBannerPos?: LowerThirdPosition;
+  onGuestBannerPosChange?: (pos: LowerThirdPosition) => void;
 }
 
 export const DualCameraStage: React.FC<DualCameraStageProps> = ({
@@ -101,7 +105,11 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
   onGuestPanChange,
   onSwapPositions,
   primaryRole = 'guest',
-  onPrimaryRoleChange
+  onPrimaryRoleChange,
+  hostBannerPos = { x: 3, y: 76 },
+  onHostBannerPosChange,
+  guestBannerPos = { x: 50, y: 76 },
+  onGuestBannerPosChange
 }) => {
   const isGuestPrimary = primaryRole === 'guest';
   const containerRef = useRef<HTMLDivElement>(null);
@@ -109,6 +117,49 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
 
   // Dragging States
   const [isDraggingPip, setIsDraggingPip] = useState<boolean>(false);
+  const [isDraggingHostBanner, setIsDraggingHostBanner] = useState<boolean>(false);
+  const [isDraggingGuestBanner, setIsDraggingGuestBanner] = useState<boolean>(false);
+
+  // Banner Drag Storage Refs
+  const hostBannerDragRef = useRef<{
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    containerWidth: number;
+    containerHeight: number;
+    boxWidth: number;
+    boxHeight: number;
+  }>({
+    startX: 0,
+    startY: 0,
+    initialX: 3,
+    initialY: 76,
+    containerWidth: 1,
+    containerHeight: 1,
+    boxWidth: 1,
+    boxHeight: 1
+  });
+
+  const guestBannerDragRef = useRef<{
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    containerWidth: number;
+    containerHeight: number;
+    boxWidth: number;
+    boxHeight: number;
+  }>({
+    startX: 0,
+    startY: 0,
+    initialX: 50,
+    initialY: 76,
+    containerWidth: 1,
+    containerHeight: 1,
+    boxWidth: 1,
+    boxHeight: 1
+  });
 
   // Temporary Drag Storage Refs
   const pipDragRef = useRef<{
@@ -213,6 +264,136 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
       }
     },
     [isDraggingPip]
+  );
+
+  // Host Banner Pointer Down
+  const handleHostBannerPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!containerRef.current || !onHostBannerPosChange) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const boxRect = e.currentTarget.getBoundingClientRect();
+      hostBannerDragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        initialX: hostBannerPos.x,
+        initialY: hostBannerPos.y,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+        boxWidth: boxRect.width,
+        boxHeight: boxRect.height
+      };
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // Safe fallback
+      }
+      setIsDraggingHostBanner(true);
+    },
+    [hostBannerPos, onHostBannerPosChange]
+  );
+
+  // Host Banner Pointer Move
+  const handleHostBannerPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDraggingHostBanner || !onHostBannerPosChange) return;
+      const { startX, startY, initialX, initialY, containerWidth, containerHeight, boxWidth, boxHeight } =
+        hostBannerDragRef.current;
+      const deltaXPercent = ((e.clientX - startX) / containerWidth) * 100;
+      const deltaYPercent = ((e.clientY - startY) / containerHeight) * 100;
+      const boxWPercent = (boxWidth / containerWidth) * 100;
+      const boxHPercent = (boxHeight / containerHeight) * 100;
+      const maxAllowedX = Math.max(0, 99 - boxWPercent);
+      const maxAllowedY = Math.max(0, 91 - boxHPercent);
+      const nextX = Math.max(1, Math.min(maxAllowedX, initialX + deltaXPercent));
+      const nextY = Math.max(1, Math.min(maxAllowedY, initialY + deltaYPercent));
+      onHostBannerPosChange({
+        x: Math.round(nextX * 10) / 10,
+        y: Math.round(nextY * 10) / 10
+      });
+    },
+    [isDraggingHostBanner, onHostBannerPosChange]
+  );
+
+  // Host Banner Pointer Up
+  const handleHostBannerPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (isDraggingHostBanner) {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          // Safe fallback
+        }
+        setIsDraggingHostBanner(false);
+      }
+    },
+    [isDraggingHostBanner]
+  );
+
+  // Guest Banner Pointer Down
+  const handleGuestBannerPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!containerRef.current || !onGuestBannerPosChange) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const boxRect = e.currentTarget.getBoundingClientRect();
+      guestBannerDragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        initialX: guestBannerPos.x,
+        initialY: guestBannerPos.y,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+        boxWidth: boxRect.width,
+        boxHeight: boxRect.height
+      };
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // Safe fallback
+      }
+      setIsDraggingGuestBanner(true);
+    },
+    [guestBannerPos, onGuestBannerPosChange]
+  );
+
+  // Guest Banner Pointer Move
+  const handleGuestBannerPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDraggingGuestBanner || !onGuestBannerPosChange) return;
+      const { startX, startY, initialX, initialY, containerWidth, containerHeight, boxWidth, boxHeight } =
+        guestBannerDragRef.current;
+      const deltaXPercent = ((e.clientX - startX) / containerWidth) * 100;
+      const deltaYPercent = ((e.clientY - startY) / containerHeight) * 100;
+      const boxWPercent = (boxWidth / containerWidth) * 100;
+      const boxHPercent = (boxHeight / containerHeight) * 100;
+      const maxAllowedX = Math.max(0, 99 - boxWPercent);
+      const maxAllowedY = Math.max(0, 91 - boxHPercent);
+      const nextX = Math.max(1, Math.min(maxAllowedX, initialX + deltaXPercent));
+      const nextY = Math.max(1, Math.min(maxAllowedY, initialY + deltaYPercent));
+      onGuestBannerPosChange({
+        x: Math.round(nextX * 10) / 10,
+        y: Math.round(nextY * 10) / 10
+      });
+    },
+    [isDraggingGuestBanner, onGuestBannerPosChange]
+  );
+
+  // Guest Banner Pointer Up
+  const handleGuestBannerPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (isDraggingGuestBanner) {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          // Safe fallback
+        }
+        setIsDraggingGuestBanner(false);
+      }
+    },
+    [isDraggingGuestBanner]
   );
 
   return (
@@ -361,31 +542,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                   <VideoOff className="w-3 h-3" />
                 </button>
               </div>
-
-              {/* Slot 1 Lower-Third Banner */}
-              {showLowerThird && (
-                <div className="absolute bottom-12 sm:bottom-14 left-2 sm:left-3 right-2 sm:right-3 pointer-events-none z-20">
-                  <div className={`inline-flex items-center bg-gradient-to-r from-black/95 via-[#0d160f]/95 to-black/85 backdrop-blur-md border-l-4 ${
-                    isGuestPrimary ? 'border-[#D4AF37]' : 'border-emerald-500'
-                  } px-3 py-1.5 rounded-r-xl border-y border-r border-white/15 shadow-2xl max-w-full`}>
-                    <div>
-                      <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5">
-                        <span className="truncate">{isGuestPrimary ? guestProfile.name : hostProfile.name}</span>
-                        {(isGuestPrimary ? guestProfile.asnNo : hostProfile.asnNo) && (
-                          <span className={`text-[9px] ${
-                            isGuestPrimary ? 'bg-amber-700 border-amber-400' : 'bg-[#006837] border-emerald-400'
-                          } text-white px-1.5 py-0.2 rounded font-bold border shrink-0`}>
-                            ASN #{isGuestPrimary ? guestProfile.asnNo : hostProfile.asnNo}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-semibold tracking-wide truncate">
-                        {isGuestPrimary ? guestProfile.title : hostProfile.title}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Seamless Split boundary (clean join between Host and Narasumber without dividing lines or grip indicator) */}
@@ -455,31 +611,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                   <VideoOff className="w-3 h-3" />
                 </button>
               </div>
-
-              {/* Slot 2 Lower-Third Banner */}
-              {showLowerThird && (
-                <div className="absolute bottom-12 sm:bottom-14 left-2 sm:left-3 right-2 sm:right-3 pointer-events-none z-20">
-                  <div className={`inline-flex items-center bg-gradient-to-r from-black/95 via-[#1a140d]/95 to-black/85 backdrop-blur-md border-l-4 ${
-                    isGuestPrimary ? 'border-emerald-500' : 'border-[#D4AF37]'
-                  } px-3 py-1.5 rounded-r-xl border-y border-r border-white/15 shadow-2xl max-w-full`}>
-                    <div>
-                      <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5">
-                        <span className="truncate">{isGuestPrimary ? hostProfile.name : guestProfile.name}</span>
-                        {(isGuestPrimary ? hostProfile.asnNo : guestProfile.asnNo) && (
-                          <span className={`text-[9px] ${
-                            isGuestPrimary ? 'bg-[#006837] border-emerald-400' : 'bg-amber-700 border-amber-400'
-                          } text-white px-1.5 py-0.2 rounded font-bold border shrink-0`}>
-                            ASN #{isGuestPrimary ? hostProfile.asnNo : guestProfile.asnNo}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-semibold tracking-wide truncate">
-                        {isGuestPrimary ? hostProfile.title : guestProfile.title}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -499,24 +630,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                 (isGuestPrimary ? isGuestMirrored : isHostMirrored) ? 'scale-x-[-1]' : ''
               } ${!(isGuestPrimary ? isGuestVideoEnabled : isHostVideoEnabled) ? 'hidden' : 'block'}`}
             />
-
-            {/* Main Camera Lower Third Banner */}
-            {showLowerThird && (
-              <div className="absolute bottom-12 sm:bottom-14 left-3 pointer-events-none z-20">
-                <div className={`inline-flex items-center bg-black/90 backdrop-blur-md border-l-4 ${
-                  isGuestPrimary ? 'border-[#D4AF37]' : 'border-emerald-500'
-                } px-3.5 py-2 rounded-r-xl border-y border-r border-white/15 shadow-2xl`}>
-                  <div>
-                    <div className="text-xs sm:text-sm font-black text-white uppercase">
-                      {isGuestPrimary ? guestProfile.name : hostProfile.name}
-                    </div>
-                    <div className="text-[10px] text-[#D4AF37]">
-                      {isGuestPrimary ? guestProfile.title : hostProfile.title}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Inset PiP Box (Kamera Kedua: Host jika isGuestPrimary) - DRAGGABLE & REPOSITIONABLE */}
             <div
@@ -605,16 +718,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                 isHostMirrored ? 'scale-x-[-1]' : ''
               } ${!isHostVideoEnabled ? 'hidden' : 'block'}`}
             />
-            {showLowerThird && (
-              <div className="absolute bottom-12 sm:bottom-14 left-3 pointer-events-none z-20">
-                <div className="inline-flex items-center bg-black/90 backdrop-blur-md border-l-4 border-emerald-500 px-3.5 py-2 rounded-r-xl border-y border-r border-white/15 shadow-2xl">
-                  <div>
-                    <div className="text-xs sm:text-sm font-black text-white uppercase">{hostProfile.name}</div>
-                    <div className="text-[10px] text-[#D4AF37]">{hostProfile.title}</div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
@@ -636,17 +739,100 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                 !isGuestVideoEnabled ? 'hidden' : 'block'
               }`}
             />
-            {showLowerThird && (
-              <div className="absolute bottom-12 sm:bottom-14 left-3 pointer-events-none z-20">
-                <div className="inline-flex items-center bg-black/90 backdrop-blur-md border-l-4 border-[#D4AF37] px-3.5 py-2 rounded-r-xl border-y border-r border-white/15 shadow-2xl">
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* DRAGGABLE & REPOSITIONABLE LOWER THIRD BANNERS OVERLAY  */}
+        {/* ======================================================== */}
+        {showLowerThird && (
+          <>
+            {/* HOST (Tuan Rumah) BANNER - Draggable */}
+            {(layout === 'pip' || layout === 'split' || layout === 'solo-host') && (
+              <div
+                onPointerDown={handleHostBannerPointerDown}
+                onPointerMove={handleHostBannerPointerMove}
+                onPointerUp={handleHostBannerPointerUp}
+                style={{
+                  left: `${hostBannerPos.x}%`,
+                  top: `${hostBannerPos.y}%`,
+                  touchAction: 'none'
+                }}
+                className={`absolute z-35 group select-none transition-shadow rounded-xl ${
+                  isDraggingHostBanner
+                    ? 'ring-2 ring-emerald-400 shadow-2xl cursor-grabbing scale-[1.02]'
+                    : 'shadow-xl hover:ring-1 hover:ring-emerald-400/50 cursor-grab'
+                }`}
+                title="Tahan & geser untuk memindahkan posisi nama Host"
+              >
+                <div className="inline-flex flex-col bg-gradient-to-r from-black/95 via-[#0a160f]/95 to-black/90 backdrop-blur-md border-l-4 border-emerald-500 pl-3 pr-3.5 py-1.5 rounded-r-xl border-y border-r border-white/15 shadow-2xl">
                   <div>
-                    <div className="text-xs sm:text-sm font-black text-white uppercase">{guestProfile.name}</div>
-                    <div className="text-[10px] text-[#D4AF37]">{guestProfile.title}</div>
+                    <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5">
+                      <span className="text-emerald-400 text-[10px]">🎙️ HOST:</span>
+                      <span className="truncate">{hostProfile.name}</span>
+                    </div>
+                    <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-semibold tracking-wide truncate">
+                      {hostProfile.title}
+                    </div>
+                  </div>
+
+                  {/* Hari, Tanggal, Bulan, Tahun & Waktu Tepat di Bawah Host */}
+                  <div className="mt-1 pt-1 border-t border-white/15 flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[9px] sm:text-[10px] text-white/90">
+                    <div className="flex items-center gap-1 text-[#D4AF37] font-bold uppercase tracking-wider">
+                      <Calendar className="w-3 h-3 text-[#D4AF37] shrink-0" />
+                      <span>{indonesianDate.dayName}, {indonesianDate.dateNum} {indonesianDate.monthName} {indonesianDate.year}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-emerald-300 font-mono text-[9px] pl-1.5 border-l border-white/25">
+                      <Clock className="w-2.5 h-2.5 text-[#D4AF37] shrink-0" />
+                      <span>{indonesianDate.timeString} WITA</span>
+                    </div>
                   </div>
                 </div>
+                {isDraggingHostBanner && (
+                  <div className="absolute -top-6 left-0 bg-emerald-950/90 border border-emerald-500/50 px-2 py-0.5 rounded text-[8px] font-mono text-emerald-300 whitespace-nowrap z-40">
+                    X: {Math.round(hostBannerPos.x)}% &bull; Y: {Math.round(hostBannerPos.y)}%
+                  </div>
+                )}
               </div>
             )}
-          </div>
+
+            {/* NARASUMBER (Tamu Undangan) BANNER - Draggable */}
+            {(layout === 'pip' || layout === 'split' || layout === 'solo-guest') && (
+              <div
+                onPointerDown={handleGuestBannerPointerDown}
+                onPointerMove={handleGuestBannerPointerMove}
+                onPointerUp={handleGuestBannerPointerUp}
+                style={{
+                  left: `${guestBannerPos.x}%`,
+                  top: `${guestBannerPos.y}%`,
+                  touchAction: 'none'
+                }}
+                className={`absolute z-35 group select-none transition-shadow rounded-xl ${
+                  isDraggingGuestBanner
+                    ? 'ring-2 ring-amber-400 shadow-2xl cursor-grabbing scale-[1.02]'
+                    : 'shadow-xl hover:ring-1 hover:ring-amber-400/50 cursor-grab'
+                }`}
+                title="Tahan & geser untuk memindahkan posisi nama Narasumber"
+              >
+                <div className="inline-flex flex-col bg-gradient-to-r from-black/95 via-[#1a140d]/95 to-black/90 backdrop-blur-md border-l-4 border-[#D4AF37] pl-3 pr-3.5 py-1.5 rounded-r-xl border-y border-r border-white/15 shadow-2xl">
+                  <div>
+                    <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5">
+                      <span className="text-amber-400 text-[10px]">👤 TAMU:</span>
+                      <span className="truncate">{guestProfile.name}</span>
+                    </div>
+                    <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-semibold tracking-wide truncate">
+                      {guestProfile.title}
+                    </div>
+                  </div>
+                </div>
+                {isDraggingGuestBanner && (
+                  <div className="absolute -top-6 left-0 bg-amber-950/90 border border-amber-500/50 px-2 py-0.5 rounded text-[8px] font-mono text-amber-300 whitespace-nowrap z-40">
+                    X: {Math.round(guestBannerPos.x)}% &bull; Y: {Math.round(guestBannerPos.y)}%
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -659,20 +845,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
             <Radio className="w-3 h-3 text-amber-300 shrink-0" />
             <span className="whitespace-nowrap">TOPIK PODCAST</span>
           </div>
-
-          {/* Day, Date, Month, Year Badge */}
-          {includeDateInTicker && (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#006837] text-white font-semibold text-[10px] sm:text-[11px] shrink-0 border-r border-emerald-500/40">
-              <Calendar className="w-3.5 h-3.5 text-[#D4AF37] shrink-0" />
-              <span className="whitespace-nowrap">
-                <span className="text-[#D4AF37] font-black uppercase">{indonesianDate.dayName}</span>, {indonesianDate.dateNum} {indonesianDate.monthName} {indonesianDate.year}
-              </span>
-              <span className="text-emerald-200/80 font-mono text-[9px] ml-1 pl-1.5 border-l border-emerald-400/40 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5 text-[#D4AF37]" />
-                {indonesianDate.timeString}
-              </span>
-            </div>
-          )}
 
           {/* Continuous Smooth Scrolling Marquee Area */}
           <div className="relative flex-1 overflow-hidden py-1.5 px-2.5">

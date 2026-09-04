@@ -1,34 +1,58 @@
-import React, { useState } from 'react';
-import { Search, Filter, Headphones, Sparkles, BookOpen } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Filter, Headphones, Sparkles, BookOpen, Video } from 'lucide-react';
 import { Episode } from '../types';
-import { EPISODES_DATA } from '../data/episodesData';
+import { getAllEpisodes } from '../utils/broadcastArchive';
 import { EpisodeCard } from './EpisodeCard';
 
 interface EpisodeGridProps {
+  episodes?: Episode[];
   onOpenEpisodeDetails: (id: string) => void;
   onShareEpisode: (episode: Episode) => void;
   onScrollToComments: (episodeId: string) => void;
 }
 
 export const EpisodeGrid: React.FC<EpisodeGridProps> = ({
+  episodes: propEpisodes,
   onOpenEpisodeDetails,
   onShareEpisode,
   onScrollToComments,
 }) => {
+  const [localEpisodes, setLocalEpisodes] = useState<Episode[]>(propEpisodes || getAllEpisodes());
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
+  useEffect(() => {
+    if (propEpisodes) {
+      setLocalEpisodes(propEpisodes);
+    } else {
+      setLocalEpisodes(getAllEpisodes());
+    }
+  }, [propEpisodes]);
+
+  useEffect(() => {
+    const handleSync = () => {
+      setLocalEpisodes(getAllEpisodes());
+    };
+    window.addEventListener('kua_broadcast_saved', handleSync);
+    return () => window.removeEventListener('kua_broadcast_saved', handleSync);
+  }, []);
+
   const categories = [
     { id: 'all', label: 'Semua Episode' },
+    { id: 'spesial', label: '🎥 Siaran Studio KUA' },
     { id: 'moderasi', label: 'Moderasi Beragama' },
     { id: 'bimwin', label: 'Bimwin & Sakinah' },
     { id: 'fiqih', label: 'Ziswaf & Layanan KUA' },
     { id: 'hindu', label: 'Bimbingan Hindu' },
-    { id: 'spesial', label: 'KUA Revitalisasi' },
   ];
 
-  const filteredEpisodes = EPISODES_DATA.filter((ep) => {
-    const matchesCategory = selectedCategory === 'all' || ep.category === selectedCategory;
+  const activeEpisodes = propEpisodes || localEpisodes;
+
+  const filteredEpisodes = activeEpisodes.filter((ep) => {
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      ep.category === selectedCategory ||
+      (selectedCategory === 'spesial' && ep.isRecordedStudio);
     const query = searchQuery.toLowerCase();
     const matchesSearch =
       ep.title.toLowerCase().includes(query) ||

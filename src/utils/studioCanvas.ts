@@ -1,4 +1,4 @@
-import { StreamLayout, StudioParticipantProfile, PipPosition, CameraPanOffset, PrimaryCameraRole } from '../types/studio';
+import { StreamLayout, StudioParticipantProfile, PipPosition, CameraPanOffset, PrimaryCameraRole, LowerThirdPosition } from '../types/studio';
 
 /**
  * Creates an animated virtual studio feed for Host
@@ -79,7 +79,7 @@ export function createVirtualHostStudio(
     ctx.fillText(`🎙️ ${hostProfile.name.toUpperCase()}`, w / 2, h - 90);
     ctx.fillStyle = '#D4AF37';
     ctx.font = '13px sans-serif';
-    ctx.fillText('HOST KUA GERUNG (STUDIO VIRTUAL)', w / 2, h - 70);
+    ctx.fillText(hostProfile.title || 'HOST KUA GERUNG (STUDIO VIRTUAL)', w / 2, h - 70);
 
     animId = requestAnimationFrame(render);
   };
@@ -160,7 +160,7 @@ export function createVirtualGuestStudio(
     ctx.fillText(`👤 ${guestProfile.name.toUpperCase()}`, w / 2, h - 90);
     ctx.fillStyle = '#F59E0B';
     ctx.font = '13px sans-serif';
-    ctx.fillText('NARASUMBER PODCAST (STUDIO VIRTUAL)', w / 2, h - 70);
+    ctx.fillText(guestProfile.title || 'NARASUMBER PODCAST (STUDIO VIRTUAL)', w / 2, h - 70);
 
     animId = requestAnimationFrame(render);
   };
@@ -188,7 +188,9 @@ export function drawCompositeFrame(
   splitRatio: number = 50,
   pipPosition?: PipPosition,
   guestPan?: CameraPanOffset,
-  primaryRole: PrimaryCameraRole = 'guest'
+  primaryRole: PrimaryCameraRole = 'guest',
+  hostBannerPos?: LowerThirdPosition,
+  guestBannerPos?: LowerThirdPosition
 ) {
   // Clear & dark studio background
   targetCtx.fillStyle = '#0a0d09';
@@ -256,32 +258,30 @@ export function drawCompositeFrame(
       drawMirroredVideo(secondaryVideo, leftW, 0, rightW, height, secondaryMirrored, guestPan);
     }
 
-    // Center divider
-    targetCtx.fillStyle = '#D4AF37';
-    targetCtx.fillRect(leftW - 2, 0, 4, height);
+    // Seamless join between left and right without dividing line
 
     // Left Slot Badge (Kamera Utama)
     targetCtx.fillStyle = isGuestPrimary ? 'rgba(212, 175, 55, 0.92)' : 'rgba(0, 104, 55, 0.9)';
-    targetCtx.fillRect(16, 20, 230, 34);
+    targetCtx.fillRect(16, 20, 240, 34);
     targetCtx.fillStyle = isGuestPrimary ? '#000000' : '#FFFFFF';
-    targetCtx.font = 'bold 13px sans-serif';
+    targetCtx.font = 'bold 12px sans-serif';
     targetCtx.fillText(
       isGuestPrimary
-        ? `👤 UTAMA: ${guestProfile.name.slice(0, 16)}`
-        : `🎙️ HOST: ${hostProfile.name.slice(0, 16)}`,
+        ? `👤 UTAMA: ${guestProfile.name.slice(0, 18)}`
+        : `🎙️ HOST: ${hostProfile.name.slice(0, 18)}`,
       26,
       42
     );
 
     // Right Slot Badge (Kamera Kedua)
     targetCtx.fillStyle = isGuestPrimary ? 'rgba(0, 104, 55, 0.9)' : 'rgba(212, 175, 55, 0.92)';
-    targetCtx.fillRect(leftW + 16, 20, 230, 34);
+    targetCtx.fillRect(leftW + 16, 20, 240, 34);
     targetCtx.fillStyle = isGuestPrimary ? '#FFFFFF' : '#000000';
-    targetCtx.font = 'bold 13px sans-serif';
+    targetCtx.font = 'bold 12px sans-serif';
     targetCtx.fillText(
       isGuestPrimary
-        ? `🎙️ KAMERA 2: ${hostProfile.name.slice(0, 16)}`
-        : `👤 NARASUMBER: ${guestProfile.name.slice(0, 16)}`,
+        ? `🎙️ KAMERA 2: ${hostProfile.name.slice(0, 18)}`
+        : `👤 NARASUMBER: ${guestProfile.name.slice(0, 18)}`,
       leftW + 26,
       42
     );
@@ -321,8 +321,8 @@ export function drawCompositeFrame(
       targetCtx.font = 'bold 11px sans-serif';
       targetCtx.fillText(
         isGuestPrimary
-          ? `🎙️ KAMERA 2 (HOST): ${secondaryProfile.name.slice(0, 14)}`
-          : `👤 KAMERA 2 (TAMU): ${secondaryProfile.name.slice(0, 14)}`,
+          ? `🎙️ KAMERA 2 (HOST): ${secondaryProfile.name.slice(0, 16)}`
+          : `👤 KAMERA 2 (TAMU): ${secondaryProfile.name.slice(0, 16)}`,
         pipX + 8,
         pipY + pipH - 8
       );
@@ -337,9 +337,98 @@ export function drawCompositeFrame(
     }
   }
 
-  // Bottom Running Teks Bar
+  // Draw Lower Third Banners (above ticker)
   const tickerH = 46;
   const tickerY = height - tickerH;
+  const ltY = tickerY - 78;
+
+  const drawHostLowerThirdBox = (x: number, y: number, name: string, title: string) => {
+    targetCtx.save();
+    const boxW = 340;
+    const boxH = 68;
+    targetCtx.fillStyle = 'rgba(10, 15, 12, 0.94)';
+    targetCtx.fillRect(x, y, boxW, boxH);
+
+    // Left accent bar: Emerald
+    targetCtx.fillStyle = '#10B981';
+    targetCtx.fillRect(x, y, 5, boxH);
+
+    // Top subtle highlight
+    targetCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    targetCtx.fillRect(x + 5, y, boxW - 5, 1);
+
+    // Line 1: Name
+    targetCtx.fillStyle = '#FFFFFF';
+    targetCtx.font = 'bold 12px sans-serif';
+    targetCtx.textAlign = 'left';
+    targetCtx.fillText(`🎙️ HOST: ${name.toUpperCase().slice(0, 24)}`, x + 14, y + 20);
+
+    // Line 2: Title
+    targetCtx.fillStyle = '#D4AF37';
+    targetCtx.font = '10px sans-serif';
+    targetCtx.fillText(title.slice(0, 38), x + 14, y + 36);
+
+    // Divider
+    targetCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    targetCtx.fillRect(x + 14, y + 43, boxW - 28, 1);
+
+    // Line 3: Hari, Tanggal, Bulan, Tahun dan Waktu tepat di bawah Host
+    targetCtx.fillStyle = '#F59E0B';
+    targetCtx.font = 'bold 10px sans-serif';
+    targetCtx.fillText(`🗓️ ${dateString.toUpperCase()}`, x + 14, y + 58);
+    targetCtx.restore();
+  };
+
+  const drawGuestLowerThirdBox = (x: number, y: number, name: string, title: string) => {
+    targetCtx.save();
+    const boxW = 320;
+    const boxH = 48;
+    targetCtx.fillStyle = 'rgba(10, 15, 12, 0.94)';
+    targetCtx.fillRect(x, y, boxW, boxH);
+
+    // Left accent bar: Gold
+    targetCtx.fillStyle = '#D4AF37';
+    targetCtx.fillRect(x, y, 5, boxH);
+
+    // Top subtle highlight
+    targetCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    targetCtx.fillRect(x + 5, y, boxW - 5, 1);
+
+    // Name
+    targetCtx.fillStyle = '#FFFFFF';
+    targetCtx.font = 'bold 12px sans-serif';
+    targetCtx.textAlign = 'left';
+    targetCtx.fillText(`👤 TAMU: ${name.toUpperCase().slice(0, 24)}`, x + 14, y + 20);
+
+    // Title / Position
+    targetCtx.fillStyle = '#D4AF37';
+    targetCtx.font = '10px sans-serif';
+    targetCtx.textAlign = 'left';
+    targetCtx.fillText(title.slice(0, 38), x + 14, y + 38);
+    targetCtx.restore();
+  };
+
+  const defaultHostX = 16;
+  const defaultHostY = ltY;
+  const defaultGuestX = Math.min(width - 336, width * 0.52);
+  const defaultGuestY = tickerY - 58;
+
+  const hX = hostBannerPos ? Math.max(8, Math.min(width - 348, (hostBannerPos.x / 100) * width)) : defaultHostX;
+  const hY = hostBannerPos ? Math.max(8, Math.min(height - 126, (hostBannerPos.y / 100) * height)) : defaultHostY;
+  const gX = guestBannerPos ? Math.max(8, Math.min(width - 336, (guestBannerPos.x / 100) * width)) : defaultGuestX;
+  const gY = guestBannerPos ? Math.max(8, Math.min(height - 110, (guestBannerPos.y / 100) * height)) : defaultGuestY;
+
+  if (layout === 'pip' || layout === 'split') {
+    // Both Host and Narasumber displayed at their draggable positions
+    drawGuestLowerThirdBox(gX, gY, guestProfile.name, guestProfile.title);
+    drawHostLowerThirdBox(hX, hY, hostProfile.name, hostProfile.title);
+  } else if (layout === 'solo-host') {
+    drawHostLowerThirdBox(hX, hY, hostProfile.name, hostProfile.title);
+  } else if (layout === 'solo-guest') {
+    drawGuestLowerThirdBox(gX, gY, guestProfile.name, guestProfile.title);
+  }
+
+  // Bottom Running Teks Bar
   targetCtx.fillStyle = 'rgba(10, 22, 13, 0.95)';
   targetCtx.fillRect(0, tickerY, width, tickerH);
 
@@ -355,21 +444,13 @@ export function drawCompositeFrame(
   targetCtx.textAlign = 'center';
   targetCtx.fillText('🔴 TOPIK PODCAST', bW / 2, tickerY + 28);
 
-  // Badge Green: Tanggal
-  const dW = 220;
-  targetCtx.fillStyle = '#006837';
-  targetCtx.fillRect(bW, tickerY, dW, tickerH);
-  targetCtx.fillStyle = '#D4AF37';
-  targetCtx.font = 'bold 12px sans-serif';
-  targetCtx.fillText(`🗓️ ${dateString}`, bW + dW / 2, tickerY + 28);
-
-  // Topic Text
+  // Topic Text spans cleanly across bottom bar
   targetCtx.fillStyle = '#FFFFFF';
   targetCtx.font = 'bold 13px sans-serif';
   targetCtx.textAlign = 'left';
   targetCtx.fillText(
     `✦ ${podcastTopic.toUpperCase()} ✦ KUA KECAMATAN GERUNG - KEMENAG LOMBOK BARAT ✦`,
-    bW + dW + 16,
+    bW + 18,
     tickerY + 28
   );
 }
