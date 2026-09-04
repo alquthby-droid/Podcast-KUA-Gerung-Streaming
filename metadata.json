@@ -1,0 +1,6 @@
+{
+  "name": "Podcast KUA Gerung - Kemenag Lombok Barat",
+  "description": "Platform podcast resmi KUA Kecamatan Gerung, Kantor Kementerian Agama Kabupaten Lombok Barat. Menghadirkan dialog inspiratif, bimbingan keluarga sakinah, dan moderasi beragama bersama Kepala KUA, Penghulu, serta Penyuluh Agama Islam dan Hindu dengan streaming audio interaktif.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
