@@ -100,7 +100,7 @@ export const Footer: React.FC<FooterProps> = ({ onOpenSocialShare }) => {
               <li className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
                 <span>
-                  Jl. Ki Hajar Dewantara No. 12, Gerung Utara, Kec. Gerung, Kabupaten Lombok Barat, Nusa Tenggara Barat 83363
+                  Jl. Gatot Subroto Gerung Lombok Barat NTB
                 </span>
               </li>
               <li className="flex items-center gap-2.5">

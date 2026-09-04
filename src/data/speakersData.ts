@@ -85,7 +85,7 @@ export const ASN_KUA_GERUNG: AsnKuaRecord[] = [
   },
   {
     no: 8,
-    name: 'Ni Wayan Ayunita Padmiyani',
+    name: 'Ni Wayan Ayunita Padmiyani, S.Pd.',
     nip: '199711272025212014',
     jabatan: 'Penyuluh Agama Hindu Ahli Pertama',
     speakerId: 'spk-ayunita',
@@ -219,7 +219,7 @@ export const SPEAKERS_DATA: Speaker[] = [
     id: 'spk-ayunita',
     role: 'penyuluh_hindu',
     roleLabel: 'Penyuluh Agama Hindu Kemenag Lobar',
-    name: 'Ni Wayan Ayunita Padmiyani',
+    name: 'Ni Wayan Ayunita Padmiyani, S.Pd.',
     title: 'Penyuluh Agama Hindu Ahli Pertama Kantor Kemenag Kab. Lombok Barat',
     nip: '199711272025212014',
     jabatan: 'Penyuluh Agama Hindu Ahli Pertama',

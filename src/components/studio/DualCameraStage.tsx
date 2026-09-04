@@ -109,7 +109,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
 
   // Dragging States
   const [isDraggingPip, setIsDraggingPip] = useState<boolean>(false);
-  const [isDraggingDivider, setIsDraggingDivider] = useState<boolean>(false);
 
   // Temporary Drag Storage Refs
   const pipDragRef = useRef<{
@@ -130,14 +129,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
     containerHeight: 1,
     boxWidth: 1,
     boxHeight: 1
-  });
-
-  const dividerDragRef = useRef<{
-    containerLeft: number;
-    containerWidth: number;
-  }>({
-    containerLeft: 0,
-    containerWidth: 1
   });
 
   // Calculate PiP dimensions based on size preset
@@ -222,61 +213,6 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
       }
     },
     [isDraggingPip]
-  );
-
-  // Handler for Split Divider pointer down
-  const handleDividerPointerDown = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!containerRef.current || !onSplitRatioChange) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      const rect = containerRef.current.getBoundingClientRect();
-      dividerDragRef.current = {
-        containerLeft: rect.left,
-        containerWidth: rect.width
-      };
-
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        // Safe fallback
-      }
-      setIsDraggingDivider(true);
-    },
-    [onSplitRatioChange]
-  );
-
-  // Handler for Split Divider pointer move
-  const handleDividerPointerMove = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (!isDraggingDivider || !onSplitRatioChange) return;
-
-      const { containerLeft, containerWidth } = dividerDragRef.current;
-      const relativeX = e.clientX - containerLeft;
-      const rawRatio = (relativeX / containerWidth) * 100;
-
-      // Clamp between 20% and 80%
-      const clampedRatio = Math.round(Math.max(20, Math.min(80, rawRatio)));
-      onSplitRatioChange(clampedRatio);
-    },
-    [isDraggingDivider, onSplitRatioChange]
-  );
-
-  // Handler for Split Divider pointer up
-  const handleDividerPointerUp = useCallback(
-    (e: React.PointerEvent<HTMLDivElement>) => {
-      if (isDraggingDivider) {
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          // Safe fallback
-        }
-        setIsDraggingDivider(false);
-      }
-    },
-    [isDraggingDivider]
   );
 
   return (
@@ -452,41 +388,7 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
               )}
             </div>
 
-            {/* DRAGGABLE CENTER DIVIDER BAR */}
-            <div
-              onPointerDown={handleDividerPointerDown}
-              onPointerMove={handleDividerPointerMove}
-              onPointerUp={handleDividerPointerUp}
-              className={`relative z-30 w-4 -mx-2 h-full cursor-col-resize flex items-center justify-center group touch-none select-none ${
-                isDraggingDivider ? 'bg-emerald-500/30' : ''
-              }`}
-              title="Tahan & geser untuk mengubah lebar tampilan kamera Host dan Narasumber"
-            >
-              {/* Divider Line */}
-              <div
-                className={`w-1 h-full shadow-lg transition-colors ${
-                  isDraggingDivider ? 'bg-amber-300' : 'bg-[#D4AF37] group-hover:bg-amber-300'
-                }`}
-              ></div>
-
-              {/* Central Grip Indicator */}
-              <div
-                className={`absolute top-1/2 -translate-y-1/2 px-1 py-3 rounded-full bg-black/90 border text-[9px] font-bold shadow-2xl flex flex-col items-center gap-0.5 transition-all ${
-                  isDraggingDivider
-                    ? 'scale-125 border-amber-300 text-amber-300 opacity-100 ring-2 ring-amber-400/40'
-                    : 'border-[#D4AF37] text-[#D4AF37] opacity-85 group-hover:opacity-100 group-hover:scale-110'
-                }`}
-              >
-                <GripVertical className="w-3.5 h-3.5" />
-              </div>
-
-              {/* Live Ratio Pill while Dragging */}
-              {isDraggingDivider && (
-                <div className="absolute top-16 -translate-x-1/2 px-2.5 py-1 rounded-full bg-black/90 border border-amber-300 text-[10px] font-mono font-bold text-amber-300 whitespace-nowrap shadow-xl">
-                  {splitRatio}% : {100 - splitRatio}%
-                </div>
-              )}
-            </div>
+            {/* Seamless Split boundary (clean join between Host and Narasumber without dividing lines or grip indicator) */}
 
             {/* BOX 2: KAMERA KEDUA (Kanan - Default Host jika isGuestPrimary) */}
             <div

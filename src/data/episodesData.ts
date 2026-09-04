@@ -13,7 +13,7 @@ export const EPISODES_DATA: Episode[] = [
     releaseDate: '28 Agustus 2026',
     audioUrl: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3',
     coverImage: 'https://images.unsplash.com/photo-1519817650390-64a93db51149?auto=format&fit=crop&w=800&q=80',
-    description: 'Kecamatan Gerung sebagai ibu kota Kabupaten Lombok Barat memiliki keragaman masyarakat Muslim dan Hindu yang hidup rukun berdampingan sejak turun-temurun. Dalam episode perdana ini, Kepala KUA Kec. Gerung H. Marliadi, S. Ag, MA bersama Penyuluh Agama Islam Hamdi Apandi, S. HI dan Penyuluh Agama Hindu Ni Wayan Ayunita Padmiyani duduk satu meja dipandu host Husni, S. Kom. I membahas kiat mempererat kohesi sosial, menolak polarisasi, dan mengamalkan 4 pilar Moderasi Beragama Kemenag RI.',
+    description: 'Kecamatan Gerung sebagai ibu kota Kabupaten Lombok Barat memiliki keragaman masyarakat Muslim dan Hindu yang hidup rukun berdampingan sejak turun-temurun. Dalam episode perdana ini, Kepala KUA Kec. Gerung H. Marliadi, S. Ag, MA bersama Penyuluh Agama Islam Hamdi Apandi, S. HI dan Penyuluh Agama Hindu Ni Wayan Ayunita Padmiyani, S.Pd. duduk satu meja dipandu host Husni, S. Kom. I membahas kiat mempererat kohesi sosial, menolak polarisasi, dan mengamalkan 4 pilar Moderasi Beragama Kemenag RI.',
     keyPoints: [
       'Empat indikator utama Moderasi Beragama Kemenag: Komitmen kebangsaan, toleransi, antikekerasan, dan akomodatif budaya lokal.',
       'Potret kerukunan di desa-desa Kecamatan Gerung: saling mengunjungi saat hari raya Idul Fitri dan Galungan-Kuningan.',
@@ -63,7 +63,7 @@ export const EPISODES_DATA: Episode[] = [
     releaseDate: '14 Agustus 2026',
     audioUrl: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3',
     coverImage: 'https://images.unsplash.com/photo-1544644181-1484b3fdfc62?auto=format&fit=crop&w=800&q=80',
-    description: 'Bersama Penyuluh Agama Hindu Kemenag Lobar Ni Wayan Ayunita Padmiyani didampingi Kepala KUA H. Marliadi, S. Ag, MA, kita mendalami konsep luhur Tri Hita Karana (hubungan harmonis manusia dengan Tuhan, sesama manusia, dan alam sekitar) serta bagaimana nilai Tat Twam Asi menjadi jembatan empati dalam kehidupan bermasyarakat majemuk di Lombok Barat.',
+    description: 'Bersama Penyuluh Agama Hindu Kemenag Lobar Ni Wayan Ayunita Padmiyani, S.Pd. didampingi Kepala KUA H. Marliadi, S. Ag, MA, kita mendalami konsep luhur Tri Hita Karana (hubungan harmonis manusia dengan Tuhan, sesama manusia, dan alam sekitar) serta bagaimana nilai Tat Twam Asi menjadi jembatan empati dalam kehidupan bermasyarakat majemuk di Lombok Barat.',
     keyPoints: [
       'Memahami esensi Tri Hita Karana dalam konteks kehidupan sehari-hari warga Lombok Barat.',
       'Konsep Tat Twam Asi: "Aku adalah engkau, engkau adalah aku" sebagai penangkal prasangka.',
@@ -175,7 +175,7 @@ export const INITIAL_COMMENTS = [
       },
       {
         id: 'rep-2',
-        authorName: 'Ni Wayan Ayunita Padmiyani',
+        authorName: 'Ni Wayan Ayunita Padmiyani, S.Pd.',
         isOfficial: true,
         officialBadge: 'Penyuluh Hindu Kemenag Lobar',
         content: 'Matur suksma atas apresiasinya Pak Hendra. Nilai persaudaraan menyama braya ini adalah kekayaan sejati Lombok Barat yang patut kita tularkan ke generasi muda.',
@@ -217,7 +217,7 @@ export const INITIAL_COMMENTS = [
     replies: [
       {
         id: 'rep-4',
-        authorName: 'Ni Wayan Ayunita Padmiyani',
+        authorName: 'Ni Wayan Ayunita Padmiyani, S.Pd.',
         isOfficial: true,
         officialBadge: 'Penyuluh Hindu Kemenag Lobar',
         content: 'Om Swastyastu Ibu Ketut Ayu. Kami menyarankan pemuda mengedepankan saring sebelum sharing dan mempraktikkan ajaran Tri Kaya Parisudha: berpikir yang baik (Manacika), berkata yang baik (Wacika), dan berbuat yang baik (Kayika). InsyaAllah kita juga terus mendampingi forum pemuda lintas iman bersama jajaran KUA Gerung.',

@@ -98,7 +98,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ initialTargetS
     if (role === 'kepala_kua') return 'H. Marliadi, S. Ag, MA (Kepala KUA)';
     if (role === 'penghulu') return 'H. Mahput, S. HI / Tim Penghulu KUA Gerung';
     if (role === 'penyuluh_islam') return 'Hamdi Apandi / Fatmatuzzakrah (Penyuluh Islam)';
-    if (role === 'penyuluh_hindu') return 'Ni Wayan Ayunita Padmiyani (Penyuluh Hindu)';
+    if (role === 'penyuluh_hindu') return 'Ni Wayan Ayunita Padmiyani, S.Pd. (Penyuluh Hindu)';
     return 'Tim Redaksi Podcast KUA Gerung';
   };
 
@@ -238,7 +238,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ initialTargetS
                     <option value="kepala_kua">Kepala KUA (H. Marliadi, S. Ag, MA)</option>
                     <option value="penghulu">Penghulu KUA (H. Mahput / Muhajirin / Rasyid)</option>
                     <option value="penyuluh_islam">Penyuluh Islam (Hamdi / Fatmatuzzakrah)</option>
-                    <option value="penyuluh_hindu">Penyuluh Hindu (Ni Wayan Ayunita Padmiyani)</option>
+                    <option value="penyuluh_hindu">Penyuluh Hindu (Ni Wayan Ayunita Padmiyani, S.Pd.)</option>
                   </select>
                 </div>
 
