@@ -9,10 +9,15 @@ export interface StudioParticipantProfile {
   role: 'host' | 'narasumber';
 }
 
+export type PipAspectRatio = '16:9' | '4:3' | '1:1' | '9:16';
+export type PipSizePreset = 'small' | 'medium' | 'large' | 'xlarge';
+
 export interface PipPosition {
   x: number; // percentage from left (0 - 100)
   y: number; // percentage from top (0 - 100)
-  size: 'small' | 'medium' | 'large'; // preset size
+  size: PipSizePreset; // preset size
+  scale?: number; // custom scale percentage (18 - 60)
+  aspectRatio?: PipAspectRatio; // aspect ratio: '16:9' | '4:3' | '1:1' | '9:16'
 }
 
 export interface LowerThirdPosition {

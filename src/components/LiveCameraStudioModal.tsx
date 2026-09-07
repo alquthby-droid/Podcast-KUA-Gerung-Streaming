@@ -38,7 +38,7 @@ import {
 } from 'lucide-react';
 import { ASN_KUA_GERUNG } from '../data/speakersData';
 import { formatIndonesianFullDate, getIndonesianDateDetails } from '../utils/formatters';
-import { StreamLayout, StudioParticipantProfile, PipPosition, CameraPanOffset, PrimaryCameraRole, LowerThirdPosition } from '../types/studio';
+import { StreamLayout, StudioParticipantProfile, PipPosition, PipAspectRatio, PipSizePreset, CameraPanOffset, PrimaryCameraRole, LowerThirdPosition } from '../types/studio';
 import { StudioLayoutBar } from './studio/StudioLayoutBar';
 import { DualCameraStage } from './studio/DualCameraStage';
 import { createVirtualHostStudio, createVirtualGuestStudio, drawCompositeFrame } from '../utils/studioCanvas';
@@ -92,7 +92,9 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   const [pipPosition, setPipPosition] = useState<PipPosition>({
     x: 66,
     y: 55,
-    size: 'medium'
+    size: 'medium',
+    scale: 32,
+    aspectRatio: '16:9'
   }); // Picture-in-Picture coordinates (drag & drop)
   const [guestPan, setGuestPan] = useState<CameraPanOffset>({
     panX: 0,
@@ -101,10 +103,11 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   }); // Camera 2 framing & angle offset
 
   // Draggable Banner Positions for Host & Narasumber (Bisa digeser ke mana saja)
-  const [hostBannerPos, setHostBannerPos] = useState<LowerThirdPosition>({ x: 3, y: 76 });
-  const [guestBannerPos, setGuestBannerPos] = useState<LowerThirdPosition>({ x: 50, y: 76 });
+  const [guestBannerPos, setGuestBannerPos] = useState<LowerThirdPosition>({ x: 3, y: 76 });
+  const [hostBannerPos, setHostBannerPos] = useState<LowerThirdPosition>({ x: 50, y: 76 });
+  const [watermarkPos, setWatermarkPos] = useState<LowerThirdPosition>({ x: 78, y: 3 });
 
-  // Primary Camera Role: 'guest' (Narasumber di kamera utama) | 'host' (Host di kamera utama)
+  // Primary Camera Role: 'guest' (Kamera 1 / Narasumber di kamera utama) | 'host' (Host di kamera utama)
   const [primaryRole, setPrimaryRole] = useState<PrimaryCameraRole>('guest');
 
   // Synchronized refs for smooth composite canvas recording
@@ -115,6 +118,7 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   const primaryRoleRef = useRef<PrimaryCameraRole>(primaryRole);
   const hostBannerPosRef = useRef<LowerThirdPosition>(hostBannerPos);
   const guestBannerPosRef = useRef<LowerThirdPosition>(guestBannerPos);
+  const watermarkPosRef = useRef<LowerThirdPosition>(watermarkPos);
 
   useEffect(() => {
     streamLayoutRef.current = streamLayout;
@@ -144,20 +148,25 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
     guestBannerPosRef.current = guestBannerPos;
   }, [guestBannerPos]);
 
+  useEffect(() => {
+    watermarkPosRef.current = watermarkPos;
+  }, [watermarkPos]);
+
   const resetBannerPositions = useCallback(() => {
-    setHostBannerPos({ x: 3, y: 76 });
-    setGuestBannerPos({ x: 50, y: 76 });
+    setGuestBannerPos({ x: 3, y: 76 });
+    setHostBannerPos({ x: 50, y: 76 });
+    setWatermarkPos({ x: 78, y: 3 });
   }, []);
 
-  // Camera 1 (Host) Controls
-  const [isHostVideoEnabled, setIsHostVideoEnabled] = useState<boolean>(true);
-  const [isHostMirrored, setIsHostMirrored] = useState<boolean>(true);
-  const [isHostVirtual, setIsHostVirtual] = useState<boolean>(false);
-
-  // Camera 2 (Narasumber) Controls
+  // Kamera 1 (Narasumber / Layar Utama) Controls
   const [isGuestVideoEnabled, setIsGuestVideoEnabled] = useState<boolean>(true);
   const [isGuestMirrored, setIsGuestMirrored] = useState<boolean>(false);
   const [isGuestVirtual, setIsGuestVirtual] = useState<boolean>(false);
+
+  // Kamera 2 (Host / Layar PiP & Sekunder) Controls
+  const [isHostVideoEnabled, setIsHostVideoEnabled] = useState<boolean>(true);
+  const [isHostMirrored, setIsHostMirrored] = useState<boolean>(true);
+  const [isHostVirtual, setIsHostVirtual] = useState<boolean>(false);
 
   // General Hardware controls
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(true);
@@ -165,14 +174,14 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '4:3'>('16:9');
   const [resolution, setResolution] = useState<'1080p' | '720p' | '480p'>('1080p');
 
-  // Participants Profiles (Host & Narasumber)
-  const [hostAsnIndex, setHostAsnIndex] = useState<number>(0); // Default: H. Marliadi (Kepala KUA)
-  const [hostCustomName, setHostCustomName] = useState<string>('');
-  const [hostCustomTitle, setHostCustomTitle] = useState<string>('');
-
-  const [guestAsnIndex, setGuestAsnIndex] = useState<number>(2); // Default: Husni, S.Kom.I (Penyuluh / Host Utama)
+  // Participants Profiles (Kamera 1: Narasumber & Kamera 2: Host)
+  const [guestAsnIndex, setGuestAsnIndex] = useState<number>(0); // Default: H. Marliadi, S.Ag, MA (Kepala KUA & Narasumber Utama)
   const [guestCustomName, setGuestCustomName] = useState<string>('');
   const [guestCustomTitle, setGuestCustomTitle] = useState<string>('');
+
+  const [hostAsnIndex, setHostAsnIndex] = useState<number>(2); // Default: Husni, S.Kom.I (Penyuluh Agama Islam & Host Utama)
+  const [hostCustomName, setHostCustomName] = useState<string>('');
+  const [hostCustomTitle, setHostCustomTitle] = useState<string>('');
 
   // Broadcast & Studio Overlays
   const [showLowerThird, setShowLowerThird] = useState<boolean>(true);
@@ -285,14 +294,13 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
       setVideoDevices(vInputs);
       setAudioDevices(aInputs);
 
-      // Default selection if not set
+      // Default selection: Kamera 1 untuk Narasumber, Kamera 2 untuk Host
       if (vInputs.length > 0) {
-        if (!selectedVideoDeviceIdHost) {
-          setSelectedVideoDeviceIdHost(vInputs[0].deviceId);
-        }
         if (!selectedVideoDeviceIdGuest) {
-          // If 2 cameras exist, assign camera 2 to guest; otherwise same camera or simulation
-          setSelectedVideoDeviceIdGuest(vInputs.length > 1 ? vInputs[1].deviceId : 'same-as-host');
+          setSelectedVideoDeviceIdGuest(vInputs[0].deviceId);
+        }
+        if (!selectedVideoDeviceIdHost) {
+          setSelectedVideoDeviceIdHost(vInputs.length > 1 ? vInputs[1].deviceId : 'same-as-guest');
         }
       }
       if (aInputs.length > 0 && !selectedAudioDeviceId) {
@@ -434,11 +442,29 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
     }
   }, [guestProfile]);
 
-  // Start Host Camera (Camera 1)
+  // Start Host Camera (Camera 2 / PiP)
   const startHostCamera = useCallback(async (videoDevId?: string, audioDevId?: string) => {
     if (videoDevId === 'simulated') {
       startSimHostStream();
       return;
+    }
+
+    // If "same-as-guest" is selected or user has 1 camera
+    if (videoDevId === 'same-as-guest') {
+      if (streamGuestRef.current && !isGuestVirtual) {
+        const clonedStream = streamGuestRef.current.clone();
+        streamHostRef.current = clonedStream;
+        setIsHostVirtual(false);
+        if (videoHostRef.current) {
+          videoHostRef.current.srcObject = clonedStream;
+          videoHostRef.current.play().catch(() => {});
+        }
+        setupAudioMeter(clonedStream);
+        return;
+      } else {
+        startSimHostStream();
+        return;
+      }
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -575,34 +601,35 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
   }, [resolution, isHostVirtual, startSimGuestStream]);
 
   // Start Dual Cameras Setup
+  // Start Dual Cameras Setup: Kamera 1 (Narasumber / Utama), Kamera 2 (Host / PiP)
   const startDualCameras = useCallback(async () => {
     setIsLoadingCamera(true);
     setErrorMessage(null);
 
     await getConnectedDevices();
-    await startHostCamera(selectedVideoDeviceIdHost, selectedAudioDeviceId);
-    await startGuestCamera(selectedVideoDeviceIdGuest || 'same-as-host');
+    await startGuestCamera(selectedVideoDeviceIdGuest || 'mobile-back');
+    await startHostCamera(selectedVideoDeviceIdHost || 'same-as-guest', selectedAudioDeviceId);
 
     setIsLoadingCamera(false);
   }, [getConnectedDevices, startHostCamera, startGuestCamera, selectedVideoDeviceIdHost, selectedVideoDeviceIdGuest, selectedAudioDeviceId]);
 
-  // Support HP Dual Kamera (Depan-Belakang)
+  // Support HP Dual Kamera (Kamera 1: Belakang untuk Narasumber, Kamera 2: Depan untuk Host)
   const enableMobileDualCameras = async () => {
     setIsLoadingCamera(true);
     setErrorMessage(null);
-    setSelectedVideoDeviceIdHost('mobile-front');
     setSelectedVideoDeviceIdGuest('mobile-back');
-    setIsHostMirrored(true);
+    setSelectedVideoDeviceIdHost('mobile-front');
     setIsGuestMirrored(false);
+    setIsHostMirrored(true);
 
     try {
-      await startHostCamera('mobile-front', selectedAudioDeviceId);
+      await startGuestCamera('mobile-back');
       try {
-        await startGuestCamera('mobile-back');
-      } catch (guestErr) {
-        console.warn('Smartphone sensor hardware limit, cloning stream:', guestErr);
-        await startGuestCamera('same-as-host');
-        setErrorMessage('Sensor kamera smartphone aktif! Mode pintar menggunakan sudut framing independen jika browser membatasi 2 sensor aktif bersamaan.');
+        await startHostCamera('mobile-front', selectedAudioDeviceId);
+      } catch (hostErr) {
+        console.warn('Smartphone sensor hardware limit, cloning stream:', hostErr);
+        await startHostCamera('same-as-guest', selectedAudioDeviceId);
+        setErrorMessage('Sensor kamera smartphone aktif! Kamera 1 (Belakang) untuk Narasumber, Kamera 2 (Framing) untuk Host.');
       }
     } catch (err) {
       console.warn('Error enabling mobile dual cameras:', err);
@@ -614,14 +641,14 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
 
   const toggleMobileCameras = async () => {
     setIsLoadingCamera(true);
-    const newHost = selectedVideoDeviceIdHost === 'mobile-front' ? 'mobile-back' : 'mobile-front';
     const newGuest = selectedVideoDeviceIdGuest === 'mobile-back' ? 'mobile-front' : 'mobile-back';
-    setSelectedVideoDeviceIdHost(newHost);
+    const newHost = selectedVideoDeviceIdHost === 'mobile-front' ? 'mobile-back' : 'mobile-front';
     setSelectedVideoDeviceIdGuest(newGuest);
-    setIsHostMirrored(newHost === 'mobile-front');
+    setSelectedVideoDeviceIdHost(newHost);
     setIsGuestMirrored(newGuest === 'mobile-front');
-    await startHostCamera(newHost, selectedAudioDeviceId);
+    setIsHostMirrored(newHost === 'mobile-front');
     await startGuestCamera(newGuest);
+    await startHostCamera(newHost, selectedAudioDeviceId);
     setIsLoadingCamera(false);
   };
 
@@ -718,7 +745,9 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
         guestPanRef.current,
         primaryRoleRef.current,
         hostBannerPosRef.current,
-        guestBannerPosRef.current
+        guestBannerPosRef.current,
+        watermarkPosRef.current,
+        showWatermark
       );
       compositeAnimRef.current = requestAnimationFrame(renderLoop);
     };
@@ -895,7 +924,9 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
       guestPan,
       primaryRole,
       hostBannerPos,
-      guestBannerPos
+      guestBannerPos,
+      watermarkPos,
+      showWatermark
     );
 
     const dataUrl = canvas.toDataURL('image/png');
@@ -934,7 +965,7 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black text-white uppercase tracking-wider">
-                  STUDIO STREAMING DUAL CAMERA
+                  STUDIO STREAMING
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-[#006837] text-[#D4AF37] font-bold text-[10px] border border-emerald-500/40">
                   HOST & NARASUMBER
@@ -1031,6 +1062,8 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
               onHostBannerPosChange={setHostBannerPos}
               guestBannerPos={guestBannerPos}
               onGuestBannerPosChange={setGuestBannerPos}
+              watermarkPos={watermarkPos}
+              onWatermarkPosChange={setWatermarkPos}
             />
 
             {/* Error / Simulation Notice if needed */}
@@ -1308,52 +1341,12 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                       </span>
                     </button>
                   </div>
-                  {/* Kamera 1 (Host / Sisi Kiri) */}
-                  <div className="p-3 rounded-2xl bg-black/40 border border-emerald-500/30 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
-                        <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Kamera 1 — Host (Kiri):</span>
-                      </label>
-                      <button
-                        onClick={() => setIsHostMirrored(!isHostMirrored)}
-                        className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                        title="Cermin Kamera Host"
-                      >
-                        <FlipHorizontal className="w-3 h-3" />
-                        <span>{isHostMirrored ? 'Cermin On' : 'Cermin Off'}</span>
-                      </button>
-                    </div>
-
-                    <select
-                      value={isHostVirtual ? 'simulated' : selectedVideoDeviceIdHost}
-                      onChange={(e) => {
-                        setSelectedVideoDeviceIdHost(e.target.value);
-                        startHostCamera(e.target.value, selectedAudioDeviceId);
-                      }}
-                      className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white focus:border-[#D4AF37] cursor-pointer"
-                    >
-                      <option value="simulated">✨ [Simulasi] Studio Virtual Host KUA</option>
-                      <option value="mobile-front">🤳 Kamera Depan HP (Selfie / Host)</option>
-                      <option value="mobile-back">📱 Kamera Belakang HP (Narasumber / Ruangan)</option>
-                      {videoDevices.map((dev, idx) => (
-                        <option key={dev.deviceId || idx} value={dev.deviceId}>
-                          {dev.isExternal ? '📹 [Eksternal/USB] ' : '💻 [Bawaan Perangkat] '}
-                          {dev.label}
-                        </option>
-                      ))}
-                      {videoDevices.length === 0 && !isHostVirtual && (
-                        <option value="">Kamera Fisik 1</option>
-                      )}
-                    </select>
-                  </div>
-
-                  {/* Kamera 2 (Narasumber / Sisi Kanan) */}
+                  {/* Kamera 1 (Narasumber / Layar Utama) */}
                   <div className="p-3 rounded-2xl bg-black/40 border border-amber-500/30 space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-white flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Kamera 2 — Narasumber (Kanan):</span>
+                        <span>Kamera 1 — Narasumber (Layar Utama):</span>
                       </label>
                       <button
                         onClick={() => setIsGuestMirrored(!isGuestMirrored)}
@@ -1373,30 +1366,73 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                       }}
                       className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white focus:border-[#D4AF37] cursor-pointer"
                     >
-                      <option value="same-as-host">🔁 Gunakan Kamera 1 (Sudut Alternatif / 1 Webcam)</option>
-                      <option value="mobile-back">📱 Kamera Belakang HP (Narasumber)</option>
-                      <option value="mobile-front">🤳 Kamera Depan HP (Host)</option>
-                      <option value="simulated-guest">✨ [Simulasi] Studio Virtual Tamu / Narasumber</option>
+                      <option value="mobile-back">📱 Kamera Belakang HP (Narasumber / Ruangan)</option>
+                      <option value="mobile-front">🤳 Kamera Depan HP</option>
+                      <option value="simulated-guest">✨ [Simulasi] Studio Virtual Narasumber</option>
+                      {videoDevices.map((dev, idx) => (
+                        <option key={dev.deviceId || idx} value={dev.deviceId}>
+                          {dev.isExternal ? '📹 [Eksternal/USB] ' : '💻 [Bawaan Perangkat] '}
+                          {dev.label}
+                        </option>
+                      ))}
+                      {videoDevices.length === 0 && !isGuestVirtual && (
+                        <option value="">Kamera Fisik 1</option>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Kamera 2 (Host / Layar PiP & Sekunder) */}
+                  <div className="p-3 rounded-2xl bg-black/40 border border-emerald-500/30 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Kamera 2 — Host (Layar PiP / Sekunder):</span>
+                      </label>
+                      <button
+                        onClick={() => setIsHostMirrored(!isHostMirrored)}
+                        className="text-[10px] text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        title="Cermin Kamera Host"
+                      >
+                        <FlipHorizontal className="w-3 h-3" />
+                        <span>{isHostMirrored ? 'Cermin On' : 'Cermin Off'}</span>
+                      </button>
+                    </div>
+
+                    <select
+                      value={isHostVirtual ? 'simulated' : selectedVideoDeviceIdHost}
+                      onChange={(e) => {
+                        setSelectedVideoDeviceIdHost(e.target.value);
+                        startHostCamera(e.target.value, selectedAudioDeviceId);
+                      }}
+                      className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white focus:border-[#D4AF37] cursor-pointer"
+                    >
+                      <option value="same-as-guest">🔁 Gunakan Kamera 1 (Sudut Alternatif / 1 Webcam)</option>
+                      <option value="mobile-front">🤳 Kamera Depan HP (Selfie / Host)</option>
+                      <option value="mobile-back">📱 Kamera Belakang HP</option>
+                      <option value="simulated">✨ [Simulasi] Studio Virtual Host KUA</option>
                       {videoDevices.map((dev, idx) => (
                         <option key={dev.deviceId || idx} value={dev.deviceId}>
                           {dev.isExternal ? '📹 [Eksternal/USB] ' : '💻 [Kamera 2] '}
                           {dev.label}
                         </option>
                       ))}
+                      {videoDevices.length === 0 && !isHostVirtual && (
+                        <option value="">Kamera Fisik 2</option>
+                      )}
                     </select>
                     <p className="text-[10px] text-white/50">
-                      Mendukung 2 kamera fisik bersamaan (HP Dual Cam depan-belakang, Webcam Laptop + USB Cam / CamLink).
+                      Mendukung 2 kamera fisik bersamaan (HP Dual Cam belakang-depan, Webcam Laptop + USB Cam / CamLink).
                     </p>
                   </div>
 
-                  {/* PENGATURAN GESER POSISI & SUDUT KAMERA 2 (NARASUMBER) */}
+                  {/* PENGATURAN GESER POSISI & SUDUT KAMERA 2 (HOST) */}
                   <div className="p-3 rounded-2xl bg-gradient-to-br from-black/60 to-[#181308]/60 border border-[#D4AF37]/50 space-y-3">
                     <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
                       <label className="text-xs font-black text-[#D4AF37] flex items-center gap-1.5 uppercase tracking-wider">
                         <Move className="w-3.5 h-3.5 text-[#D4AF37]" />
-                        <span>Geser Posisi & Tata Letak Kamera 2</span>
+                        <span>Geser Posisi & Tata Letak Kamera 2 (Host)</span>
                       </label>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/30">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
                         Mode {streamLayout.toUpperCase()}
                       </span>
                     </div>
@@ -1455,28 +1491,100 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                           </button>
                         </div>
 
+                        {/* Format Rasio Kamera Host (Kamera 2) */}
                         <div>
-                          <span className="text-[10px] text-white/70 block mb-1">Ukuran Kotak Kamera 2:</span>
-                          <div className="flex items-center gap-1.5">
-                            {(['small', 'medium', 'large'] as const).map((sz) => (
-                              <button
-                                key={sz}
-                                type="button"
-                                onClick={() => setPipPosition({ ...pipPosition, size: sz })}
-                                className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                                  pipPosition.size === sz
-                                    ? 'bg-[#006837] text-white border border-emerald-400'
-                                    : 'bg-white/10 text-white/80 hover:bg-white/20'
-                                }`}
-                              >
-                                {sz === 'small' ? 'Kecil (24%)' : sz === 'medium' ? 'Sedang (32%)' : 'Besar (40%)'}
-                              </button>
-                            ))}
+                          <span className="text-[10px] text-white/70 block mb-1">
+                            📐 Format Rasio Kamera Host (Kamera 2):
+                          </span>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {[
+                              { id: '16:9', label: '16:9', desc: 'Standar Widescreen' },
+                              { id: '4:3', label: '4:3', desc: 'Klasik TV' },
+                              { id: '1:1', label: '1:1', desc: 'Persegi / Square' },
+                              { id: '9:16', label: '9:16', desc: 'Potret Vertikal' }
+                            ].map((r) => {
+                              const isActive = (pipPosition.aspectRatio || '16:9') === r.id;
+                              return (
+                                <button
+                                  key={r.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setPipPosition({ ...pipPosition, aspectRatio: r.id as PipAspectRatio })
+                                  }
+                                  className={`py-1.5 px-1 rounded-lg text-center transition-all cursor-pointer ${
+                                    isActive
+                                      ? 'bg-emerald-600 text-white border border-emerald-400 font-extrabold shadow-sm ring-1 ring-emerald-300'
+                                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                                  }`}
+                                >
+                                  <div className="text-[11px] font-mono font-bold leading-tight">{r.label}</div>
+                                  <div className="text-[8px] opacity-75 leading-tight truncate">{r.desc}</div>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
+                        {/* Ukuran Kamera Host (Kamera 2) */}
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] text-white/70 mb-1">
+                            <span>📏 Ukuran Kamera Host:</span>
+                            <span className="text-amber-300 font-mono font-bold">
+                              {pipPosition.scale || (pipPosition.size === 'small' ? 22 : pipPosition.size === 'large' ? 42 : pipPosition.size === 'xlarge' ? 52 : 32)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 mb-2">
+                            {[
+                              { id: 'small', label: 'Kecil', scale: 22 },
+                              { id: 'medium', label: 'Sedang', scale: 32 },
+                              { id: 'large', label: 'Besar', scale: 42 },
+                              { id: 'xlarge', label: 'Ekstra', scale: 52 }
+                            ].map((sz) => {
+                              const currentScale = pipPosition.scale || (pipPosition.size === 'small' ? 22 : pipPosition.size === 'large' ? 42 : pipPosition.size === 'xlarge' ? 52 : 32);
+                              const isActive = Math.abs(currentScale - sz.scale) < 5 || pipPosition.size === sz.id;
+                              return (
+                                <button
+                                  key={sz.id}
+                                  type="button"
+                                  onClick={() =>
+                                    setPipPosition({
+                                      ...pipPosition,
+                                      size: sz.id as PipSizePreset,
+                                      scale: sz.scale
+                                    })
+                                  }
+                                  className={`flex-1 py-1 rounded-lg text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                    isActive
+                                      ? 'bg-[#006837] text-white border border-emerald-400 font-extrabold shadow-sm'
+                                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                                  }`}
+                                >
+                                  {sz.label} ({sz.scale}%)
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <input
+                            type="range"
+                            min={18}
+                            max={60}
+                            value={pipPosition.scale || (pipPosition.size === 'small' ? 22 : pipPosition.size === 'large' ? 42 : pipPosition.size === 'xlarge' ? 52 : 32)}
+                            onChange={(e) => {
+                              const val = Number(e.target.value);
+                              const sizePreset: PipSizePreset =
+                                val <= 25 ? 'small' : val <= 36 ? 'medium' : val <= 46 ? 'large' : 'xlarge';
+                              setPipPosition({
+                                ...pipPosition,
+                                scale: val,
+                                size: sizePreset
+                              });
+                            }}
+                            className="w-full accent-amber-400 cursor-pointer"
+                          />
+                        </div>
+
                         <div className="p-2 rounded-xl bg-black/40 border border-[#D4AF37]/30 text-[10px] text-[#D4AF37]">
-                          ✨ <strong>Geser Bebas Langsung:</strong> Kotak kamera kedua juga bisa diklik dan digeser (drag & drop) ke posisi mana saja di monitor siaran!
+                          ✨ <strong>Geser & Atur Bebas:</strong> Rasio bentuk (16:9, 4:3, 1:1, 9:16) dan ukuran kamera Host juga bisa diubah langsung melalui bilah atas atau langsung di atas kotak monitor!
                         </div>
                       </div>
                     )}
@@ -1665,61 +1773,17 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                 </div>
               )}
 
-              {/* TAB 2: PROFIL HOST, NARASUMBER, DAN RUNNING TEKS */}
+              {/* TAB 2: PROFIL NARASUMBER, HOST, DAN RUNNING TEKS */}
               {activeStudioTab === 'overlay' && (
                 <div className="space-y-3.5 max-h-[50vh] overflow-y-auto pr-1">
-                  {/* PROFIL HOST */}
-                  <div className="p-3 rounded-2xl bg-black/40 border border-emerald-500/30 space-y-2">
-                    <label className="text-xs font-black text-white flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                        Profil Host (Tuan Rumah):
-                      </span>
-                      <span className="text-[10px] text-emerald-400 font-semibold">Sisi Kiri</span>
-                    </label>
-
-                    <select
-                      value={hostAsnIndex}
-                      onChange={(e) => {
-                        setHostAsnIndex(Number(e.target.value));
-                        setHostCustomName('');
-                        setHostCustomTitle('');
-                      }}
-                      className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white focus:border-emerald-400 cursor-pointer"
-                    >
-                      {ASN_KUA_GERUNG.map((asn, idx) => (
-                        <option key={asn.no} value={idx}>
-                          #{asn.no} - {asn.name} ({asn.jabatan.slice(0, 24)}...)
-                        </option>
-                      ))}
-                    </select>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        placeholder="Nama Kustom Host"
-                        value={hostCustomName}
-                        onChange={(e) => setHostCustomName(e.target.value)}
-                        className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1 text-xs text-white"
-                      />
-                      <input
-                        type="text"
-                        placeholder="Jabatan Kustom"
-                        value={hostCustomTitle}
-                        onChange={(e) => setHostCustomTitle(e.target.value)}
-                        className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1 text-xs text-white"
-                      />
-                    </div>
-                  </div>
-
-                  {/* PROFIL NARASUMBER */}
+                  {/* PROFIL NARASUMBER (KAMERA 1) */}
                   <div className="p-3 rounded-2xl bg-black/40 border border-amber-500/30 space-y-2">
                     <label className="text-xs font-black text-white flex items-center justify-between">
                       <span className="flex items-center gap-1.5">
                         <User className="w-3.5 h-3.5 text-amber-400" />
-                        Profil Narasumber (Tamu Undangan):
+                        Profil Narasumber (Kamera 1 — Layar Utama):
                       </span>
-                      <span className="text-[10px] text-amber-400 font-semibold">Sisi Kanan</span>
+                      <span className="text-[10px] text-amber-400 font-semibold">Utama</span>
                     </label>
 
                     <select
@@ -1751,6 +1815,50 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                         placeholder="Jabatan / Instansi"
                         value={guestCustomTitle}
                         onChange={(e) => setGuestCustomTitle(e.target.value)}
+                        className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1 text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* PROFIL HOST (KAMERA 2) */}
+                  <div className="p-3 rounded-2xl bg-black/40 border border-emerald-500/30 space-y-2">
+                    <label className="text-xs font-black text-white flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        Profil Host (Kamera 2 — Layar PiP / Sekunder):
+                      </span>
+                      <span className="text-[10px] text-emerald-400 font-semibold">PiP / Host</span>
+                    </label>
+
+                    <select
+                      value={hostAsnIndex}
+                      onChange={(e) => {
+                        setHostAsnIndex(Number(e.target.value));
+                        setHostCustomName('');
+                        setHostCustomTitle('');
+                      }}
+                      className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white focus:border-emerald-400 cursor-pointer"
+                    >
+                      {ASN_KUA_GERUNG.map((asn, idx) => (
+                        <option key={asn.no} value={idx}>
+                          #{asn.no} - {asn.name} ({asn.jabatan.slice(0, 24)}...)
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        placeholder="Nama Kustom Host"
+                        value={hostCustomName}
+                        onChange={(e) => setHostCustomName(e.target.value)}
+                        className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1 text-xs text-white"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Jabatan Kustom"
+                        value={hostCustomTitle}
+                        onChange={(e) => setHostCustomTitle(e.target.value)}
                         className="w-full bg-[#0E100A] border border-white/15 rounded-xl px-2.5 py-1 text-xs text-white"
                       />
                     </div>
@@ -1840,6 +1948,92 @@ export const LiveCameraStudioModal: React.FC<LiveCameraStudioModalProps> = ({ is
                       />
                       <span>Tampilkan Watermark Kemenag RI</span>
                     </label>
+
+                    {showWatermark && (
+                      <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 space-y-2 mt-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-bold text-[#D4AF37] flex items-center gap-1">
+                            <span>Posisi Logo Kemenag di Layar Monitor:</span>
+                          </span>
+                          <span className="text-[9px] font-mono text-white/50">
+                            X: {Math.round(watermarkPos.x)}% &bull; Y: {Math.round(watermarkPos.y)}%
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => setWatermarkPos({ x: 2.5, y: 3 })}
+                            className={`py-1 px-1.5 rounded text-center transition-colors cursor-pointer ${
+                              watermarkPos.x < 20 && watermarkPos.y < 20
+                                ? 'bg-[#D4AF37] text-black font-bold'
+                                : 'bg-black/40 text-white/80 hover:bg-white/10'
+                            }`}
+                            title="Pindah Logo ke Kiri Atas"
+                          >
+                            ↖ Kiri Atas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWatermarkPos({ x: 42, y: 3 })}
+                            className={`py-1 px-1.5 rounded text-center transition-colors cursor-pointer ${
+                              watermarkPos.x >= 30 && watermarkPos.x <= 60 && watermarkPos.y < 20
+                                ? 'bg-[#D4AF37] text-black font-bold'
+                                : 'bg-black/40 text-white/80 hover:bg-white/10'
+                            }`}
+                            title="Pindah Logo ke Tengah Atas"
+                          >
+                            ↑ Tengah
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWatermarkPos({ x: 78, y: 3 })}
+                            className={`py-1 px-1.5 rounded text-center transition-colors cursor-pointer ${
+                              watermarkPos.x > 60 && watermarkPos.y < 20
+                                ? 'bg-[#D4AF37] text-black font-bold'
+                                : 'bg-black/40 text-white/80 hover:bg-white/10'
+                            }`}
+                            title="Pindah Logo ke Kanan Atas"
+                          >
+                            ↗ Kanan Atas
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWatermarkPos({ x: 2.5, y: 70 })}
+                            className={`py-1 px-1.5 rounded text-center transition-colors cursor-pointer ${
+                              watermarkPos.x < 20 && watermarkPos.y >= 50
+                                ? 'bg-[#D4AF37] text-black font-bold'
+                                : 'bg-black/40 text-white/80 hover:bg-white/10'
+                            }`}
+                            title="Pindah Logo ke Kiri Bawah"
+                          >
+                            ↙ Kiri Bawah
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWatermarkPos({ x: 78, y: 70 })}
+                            className={`py-1 px-1.5 rounded text-center transition-colors cursor-pointer ${
+                              watermarkPos.x > 60 && watermarkPos.y >= 50
+                                ? 'bg-[#D4AF37] text-black font-bold'
+                                : 'bg-black/40 text-white/80 hover:bg-white/10'
+                            }`}
+                            title="Pindah Logo ke Kanan Bawah"
+                          >
+                            ↘ Kanan Bawah
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWatermarkPos({ x: 78, y: 3 })}
+                            className="py-1 px-1.5 rounded text-center bg-white/5 hover:bg-white/10 text-white/60 cursor-pointer"
+                            title="Reset Posisi Logo Kemenag"
+                          >
+                            ↺ Reset
+                          </button>
+                        </div>
+                        <p className="text-[9px] text-white/50">
+                          💡 Logo Kemenag pada monitor juga dapat langsung diklik dan digeser (drag & drop) ke posisi mana saja.
+                        </p>
+                      </div>
+                    )}
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"

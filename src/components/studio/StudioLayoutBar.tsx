@@ -1,5 +1,5 @@
 import React from 'react';
-import { Columns2, Layers, User, UserCheck, ArrowLeftRight, Move, SlidersHorizontal } from 'lucide-react';
+import { Columns2, Layers, User, UserCheck, ArrowLeftRight, Move, SlidersHorizontal, Maximize2, Scaling } from 'lucide-react';
 import { StreamLayout, PipPosition, PrimaryCameraRole } from '../../types/studio';
 
 interface StudioLayoutBarProps {
@@ -17,6 +17,14 @@ interface StudioLayoutBarProps {
   onResetBannerPositions?: () => void;
 }
 
+const DEFAULT_PIP_POSITION: PipPosition = {
+  x: 68,
+  y: 60,
+  size: 'medium',
+  scale: 32,
+  aspectRatio: '16:9'
+};
+
 export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
   layout,
   onLayoutChange,
@@ -25,7 +33,7 @@ export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
   guestName,
   splitRatio = 50,
   onSplitRatioChange,
-  pipPosition = { x: 68, y: 60, size: 'medium' },
+  pipPosition = DEFAULT_PIP_POSITION,
   onPipPositionChange,
   primaryRole = 'guest',
   onPrimaryRoleChange,
@@ -145,51 +153,118 @@ export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
       )}
 
       {layout === 'pip' && onPipPositionChange && (
-        <div className="flex items-center gap-1 bg-black/70 px-2 py-1 rounded-xl border border-amber-500/30 text-[11px]">
-          <span className="text-amber-300 font-bold hidden sm:inline flex items-center gap-1">
-            <Move className="w-3 h-3 animate-pulse" />
-            <span>Geser PiP:</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => onPipPositionChange({ ...pipPosition, x: 2, y: 12 })}
-            className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-amber-500 hover:text-black font-bold cursor-pointer"
-            title="Geser ke Kiri Atas"
-          >
-            ↖ Kiri Atas
-          </button>
-          <button
-            type="button"
-            onClick={() => onPipPositionChange({ ...pipPosition, x: 66, y: 12 })}
-            className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-amber-500 hover:text-black font-bold cursor-pointer"
-            title="Geser ke Kanan Atas"
-          >
-            ↗ Kanan Atas
-          </button>
-          <button
-            type="button"
-            onClick={() => onPipPositionChange({ ...pipPosition, x: 2, y: 55 })}
-            className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-amber-500 hover:text-black font-bold cursor-pointer"
-            title="Geser ke Kiri Bawah"
-          >
-            ↙ Kiri Bawah
-          </button>
-          <button
-            type="button"
-            onClick={() => onPipPositionChange({ ...pipPosition, x: 66, y: 55 })}
-            className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-amber-500 hover:text-black font-bold cursor-pointer"
-            title="Geser ke Kanan Bawah"
-          >
-            ↘ Kanan Bawah
-          </button>
-          <button
-            type="button"
-            onClick={() => onPipPositionChange({ ...pipPosition, x: 34, y: 32 })}
-            className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-amber-500 hover:text-black font-bold cursor-pointer"
-            title="Geser ke Tengah"
-          >
-            ✛ Tengah
-          </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Pilihan Rasio Kamera Host */}
+          <div className="flex items-center gap-1 bg-black/75 px-2 py-1 rounded-xl border border-emerald-500/40 text-[11px] shadow-sm">
+            <span className="text-emerald-400 font-bold hidden sm:inline flex items-center gap-1">
+              <Scaling className="w-3 h-3 text-emerald-400" />
+              <span>Rasio Host:</span>
+            </span>
+            {(['16:9', '4:3', '1:1', '9:16'] as const).map((r) => {
+              const isActive = (pipPosition.aspectRatio || '16:9') === r;
+              return (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => onPipPositionChange({ ...pipPosition, aspectRatio: r })}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold cursor-pointer transition-all ${
+                    isActive
+                      ? 'bg-emerald-500 text-black shadow-md font-extrabold scale-105'
+                      : 'bg-white/10 text-white/80 hover:text-white hover:bg-white/20'
+                  }`}
+                  title={`Ubah format rasio kamera host ke ${r}`}
+                >
+                  {r}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Pilihan Ukuran Kamera Host */}
+          <div className="flex items-center gap-1 bg-black/75 px-2 py-1 rounded-xl border border-amber-500/40 text-[11px] shadow-sm">
+            <span className="text-amber-300 font-bold hidden md:inline flex items-center gap-1">
+              <Maximize2 className="w-3 h-3 text-amber-400" />
+              <span>Ukuran:</span>
+            </span>
+            {[
+              { id: 'small', label: '22%', scale: 22, title: 'Kecil (22%)' },
+              { id: 'medium', label: '32%', scale: 32, title: 'Sedang (32%)' },
+              { id: 'large', label: '42%', scale: 42, title: 'Besar (42%)' },
+              { id: 'xlarge', label: '52%', scale: 52, title: 'Ekstra Besar (52%)' }
+            ].map((sz) => {
+              const currentScale = pipPosition.scale || (pipPosition.size === 'small' ? 22 : pipPosition.size === 'large' ? 42 : pipPosition.size === 'xlarge' ? 52 : 32);
+              const isActive = Math.abs(currentScale - sz.scale) < 5 || pipPosition.size === sz.id;
+              return (
+                <button
+                  key={sz.id}
+                  type="button"
+                  onClick={() =>
+                    onPipPositionChange({
+                      ...pipPosition,
+                      size: sz.id as 'small' | 'medium' | 'large' | 'xlarge',
+                      scale: sz.scale
+                    })
+                  }
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer transition-all ${
+                    isActive
+                      ? 'bg-amber-400 text-black shadow-md font-extrabold scale-105'
+                      : 'bg-white/10 text-white/80 hover:text-white hover:bg-white/20'
+                  }`}
+                  title={sz.title}
+                >
+                  {sz.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Tombol Cepat Posisi Layar */}
+          <div className="flex items-center gap-1 bg-black/75 px-2 py-1 rounded-xl border border-white/15 text-[11px]">
+            <span className="text-white/60 font-bold hidden lg:inline flex items-center gap-1">
+              <Move className="w-3 h-3 text-white/70" />
+              <span>Posisi:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onPipPositionChange({ ...pipPosition, x: 2, y: 12 })}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-[#D4AF37] hover:text-black font-bold cursor-pointer"
+              title="Geser ke Kiri Atas"
+            >
+              ↖
+            </button>
+            <button
+              type="button"
+              onClick={() => onPipPositionChange({ ...pipPosition, x: 66, y: 12 })}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-[#D4AF37] hover:text-black font-bold cursor-pointer"
+              title="Geser ke Kanan Atas"
+            >
+              ↗
+            </button>
+            <button
+              type="button"
+              onClick={() => onPipPositionChange({ ...pipPosition, x: 2, y: 55 })}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-[#D4AF37] hover:text-black font-bold cursor-pointer"
+              title="Geser ke Kiri Bawah"
+            >
+              ↙
+            </button>
+            <button
+              type="button"
+              onClick={() => onPipPositionChange({ ...pipPosition, x: 66, y: 55 })}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-[#D4AF37] hover:text-black font-bold cursor-pointer"
+              title="Geser ke Kanan Bawah"
+            >
+              ↘
+            </button>
+            <button
+              type="button"
+              onClick={() => onPipPositionChange({ ...pipPosition, x: 34, y: 32 })}
+              className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white hover:bg-[#D4AF37] hover:text-black font-bold cursor-pointer"
+              title="Geser ke Tengah"
+            >
+              ✛
+            </button>
+          </div>
         </div>
       )}
 
@@ -228,11 +303,11 @@ export const StudioLayoutBar: React.FC<StudioLayoutBarProps> = ({
           <ArrowLeftRight className="w-3.5 h-3.5" />
           {primaryRole === 'guest' ? (
             <span>
-              <span className="text-[#D4AF37] font-extrabold">Utama:</span> Narasumber &bull; <span className="text-white/80">Kam 2:</span> Host
+              <span className="text-[#D4AF37] font-extrabold">Kam 1 (Utama):</span> Narasumber &bull; <span className="text-emerald-300 font-bold">Kam 2 (PiP):</span> Host
             </span>
           ) : (
             <span>
-              <span className="text-emerald-400 font-extrabold">Utama:</span> Host &bull; <span className="text-white/80">Kam 2:</span> Narasumber
+              <span className="text-emerald-400 font-extrabold">Kam 1 (Utama):</span> Host &bull; <span className="text-[#D4AF37] font-bold">Kam 2 (PiP):</span> Narasumber
             </span>
           )}
         </button>

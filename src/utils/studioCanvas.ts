@@ -190,7 +190,9 @@ export function drawCompositeFrame(
   guestPan?: CameraPanOffset,
   primaryRole: PrimaryCameraRole = 'guest',
   hostBannerPos?: LowerThirdPosition,
-  guestBannerPos?: LowerThirdPosition
+  guestBannerPos?: LowerThirdPosition,
+  watermarkPos?: LowerThirdPosition,
+  showWatermark: boolean = true
 ) {
   // Clear & dark studio background
   targetCtx.fillStyle = '#0a0d09';
@@ -262,26 +264,26 @@ export function drawCompositeFrame(
 
     // Left Slot Badge (Kamera Utama)
     targetCtx.fillStyle = isGuestPrimary ? 'rgba(212, 175, 55, 0.92)' : 'rgba(0, 104, 55, 0.9)';
-    targetCtx.fillRect(16, 20, 240, 34);
+    targetCtx.fillRect(16, 20, 260, 34);
     targetCtx.fillStyle = isGuestPrimary ? '#000000' : '#FFFFFF';
     targetCtx.font = 'bold 12px sans-serif';
     targetCtx.fillText(
       isGuestPrimary
-        ? `👤 UTAMA: ${guestProfile.name.slice(0, 18)}`
-        : `🎙️ HOST: ${hostProfile.name.slice(0, 18)}`,
+        ? `👤 KAMERA 1: ${guestProfile.name.slice(0, 18)}`
+        : `🎙️ KAMERA 1: ${hostProfile.name.slice(0, 18)}`,
       26,
       42
     );
 
     // Right Slot Badge (Kamera Kedua)
     targetCtx.fillStyle = isGuestPrimary ? 'rgba(0, 104, 55, 0.9)' : 'rgba(212, 175, 55, 0.92)';
-    targetCtx.fillRect(leftW + 16, 20, 240, 34);
+    targetCtx.fillRect(leftW + 16, 20, 260, 34);
     targetCtx.fillStyle = isGuestPrimary ? '#FFFFFF' : '#000000';
     targetCtx.font = 'bold 12px sans-serif';
     targetCtx.fillText(
       isGuestPrimary
         ? `🎙️ KAMERA 2: ${hostProfile.name.slice(0, 18)}`
-        : `👤 NARASUMBER: ${guestProfile.name.slice(0, 18)}`,
+        : `👤 KAMERA 2: ${guestProfile.name.slice(0, 18)}`,
       leftW + 26,
       42
     );
@@ -293,9 +295,27 @@ export function drawCompositeFrame(
 
     // 2. Kamera Kedua (Inset PiP: Host jika isGuestPrimary)
     if (secondaryVideo && secondaryVideo.readyState >= 2) {
-      const pipScale = pipPosition?.size === 'small' ? 0.24 : pipPosition?.size === 'large' ? 0.40 : 0.32;
+      let pipScale = 0.32;
+      if (pipPosition?.scale) {
+        pipScale = Math.max(0.18, Math.min(0.65, pipPosition.scale / 100));
+      } else if (pipPosition?.size === 'small') {
+        pipScale = 0.22;
+      } else if (pipPosition?.size === 'large') {
+        pipScale = 0.42;
+      } else if (pipPosition?.size === 'xlarge') {
+        pipScale = 0.52;
+      }
+
       const pipW = width * pipScale;
-      const pipH = pipW * (9 / 16);
+      const aspect = pipPosition?.aspectRatio || '16:9';
+      let pipH = pipW * (9 / 16);
+      if (aspect === '4:3') {
+        pipH = pipW * (3 / 4);
+      } else if (aspect === '1:1') {
+        pipH = pipW * 1.0;
+      } else if (aspect === '9:16') {
+        pipH = pipW * (16 / 9);
+      }
       
       const pipX = pipPosition
         ? Math.max(8, Math.min(width - pipW - 8, (pipPosition.x / 100) * width))
@@ -322,7 +342,7 @@ export function drawCompositeFrame(
       targetCtx.fillText(
         isGuestPrimary
           ? `🎙️ KAMERA 2 (HOST): ${secondaryProfile.name.slice(0, 16)}`
-          : `👤 KAMERA 2 (TAMU): ${secondaryProfile.name.slice(0, 16)}`,
+          : `👤 KAMERA 2 (NARASUMBER): ${secondaryProfile.name.slice(0, 16)}`,
         pipX + 8,
         pipY + pipH - 8
       );
@@ -344,67 +364,49 @@ export function drawCompositeFrame(
 
   const drawHostLowerThirdBox = (x: number, y: number, name: string, title: string) => {
     targetCtx.save();
-    const boxW = 340;
-    const boxH = 68;
-    targetCtx.fillStyle = 'rgba(10, 15, 12, 0.94)';
-    targetCtx.fillRect(x, y, boxW, boxH);
-
-    // Left accent bar: Emerald
-    targetCtx.fillStyle = '#10B981';
-    targetCtx.fillRect(x, y, 5, boxH);
-
-    // Top subtle highlight
-    targetCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    targetCtx.fillRect(x + 5, y, boxW - 5, 1);
+    // Shadow for clear legibility over video without solid black background
+    targetCtx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    targetCtx.shadowBlur = 6;
+    targetCtx.shadowOffsetX = 0;
+    targetCtx.shadowOffsetY = 2;
 
     // Line 1: Name
     targetCtx.fillStyle = '#FFFFFF';
     targetCtx.font = 'bold 12px sans-serif';
     targetCtx.textAlign = 'left';
-    targetCtx.fillText(`🎙️ HOST: ${name.toUpperCase().slice(0, 24)}`, x + 14, y + 20);
+    targetCtx.fillText(`🎙️ HOST: ${name.toUpperCase().slice(0, 24)}`, x, y + 16);
 
     // Line 2: Title
     targetCtx.fillStyle = '#D4AF37';
-    targetCtx.font = '10px sans-serif';
-    targetCtx.fillText(title.slice(0, 38), x + 14, y + 36);
-
-    // Divider
-    targetCtx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-    targetCtx.fillRect(x + 14, y + 43, boxW - 28, 1);
+    targetCtx.font = 'bold 10px sans-serif';
+    targetCtx.fillText(title.slice(0, 38), x, y + 32);
 
     // Line 3: Hari, Tanggal, Bulan, Tahun dan Waktu tepat di bawah Host
     targetCtx.fillStyle = '#F59E0B';
     targetCtx.font = 'bold 10px sans-serif';
-    targetCtx.fillText(`🗓️ ${dateString.toUpperCase()}`, x + 14, y + 58);
+    targetCtx.fillText(`🗓️ ${dateString.toUpperCase()}`, x, y + 48);
     targetCtx.restore();
   };
 
   const drawGuestLowerThirdBox = (x: number, y: number, name: string, title: string) => {
     targetCtx.save();
-    const boxW = 320;
-    const boxH = 48;
-    targetCtx.fillStyle = 'rgba(10, 15, 12, 0.94)';
-    targetCtx.fillRect(x, y, boxW, boxH);
-
-    // Left accent bar: Gold
-    targetCtx.fillStyle = '#D4AF37';
-    targetCtx.fillRect(x, y, 5, boxH);
-
-    // Top subtle highlight
-    targetCtx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    targetCtx.fillRect(x + 5, y, boxW - 5, 1);
+    // Shadow for clear legibility over video without solid black background
+    targetCtx.shadowColor = 'rgba(0, 0, 0, 0.95)';
+    targetCtx.shadowBlur = 6;
+    targetCtx.shadowOffsetX = 0;
+    targetCtx.shadowOffsetY = 2;
 
     // Name
     targetCtx.fillStyle = '#FFFFFF';
     targetCtx.font = 'bold 12px sans-serif';
     targetCtx.textAlign = 'left';
-    targetCtx.fillText(`👤 TAMU: ${name.toUpperCase().slice(0, 24)}`, x + 14, y + 20);
+    targetCtx.fillText(`👤 NARASUMBER: ${name.toUpperCase().slice(0, 24)}`, x, y + 16);
 
     // Title / Position
     targetCtx.fillStyle = '#D4AF37';
-    targetCtx.font = '10px sans-serif';
+    targetCtx.font = 'bold 10px sans-serif';
     targetCtx.textAlign = 'left';
-    targetCtx.fillText(title.slice(0, 38), x + 14, y + 38);
+    targetCtx.fillText(title.slice(0, 38), x, y + 32);
     targetCtx.restore();
   };
 
@@ -426,6 +428,39 @@ export function drawCompositeFrame(
     drawHostLowerThirdBox(hX, hY, hostProfile.name, hostProfile.title);
   } else if (layout === 'solo-guest') {
     drawGuestLowerThirdBox(gX, gY, guestProfile.name, guestProfile.title);
+  }
+
+  // Official Kemenag Watermark Overlay (Rendered at customizable/draggable position)
+  if (showWatermark) {
+    const wmBoxW = 160;
+    const wmBoxH = 36;
+    const defWmX = Math.max(12, width - wmBoxW - 16);
+    const defWmY = 16;
+    const wmX = watermarkPos
+      ? Math.max(10, Math.min(width - wmBoxW - 10, (watermarkPos.x / 100) * width))
+      : defWmX;
+    const wmY = watermarkPos
+      ? Math.max(10, Math.min(height - wmBoxH - tickerH - 10, (watermarkPos.y / 100) * height))
+      : defWmY;
+
+    targetCtx.save();
+    targetCtx.fillStyle = 'rgba(10, 15, 12, 0.85)';
+    targetCtx.fillRect(wmX, wmY, wmBoxW, wmBoxH);
+
+    targetCtx.strokeStyle = 'rgba(212, 175, 55, 0.5)';
+    targetCtx.lineWidth = 1;
+    targetCtx.strokeRect(wmX, wmY, wmBoxW, wmBoxH);
+
+    // Kemenag text
+    targetCtx.fillStyle = '#D4AF37';
+    targetCtx.font = 'bold 11px sans-serif';
+    targetCtx.textAlign = 'left';
+    targetCtx.fillText('🏛️ KUA GERUNG', wmX + 10, wmY + 16);
+
+    targetCtx.fillStyle = '#34D399';
+    targetCtx.font = 'bold 9px sans-serif';
+    targetCtx.fillText('KEMENAG LOBAR', wmX + 10, wmY + 29);
+    targetCtx.restore();
   }
 
   // Bottom Running Teks Bar

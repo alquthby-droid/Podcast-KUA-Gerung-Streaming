@@ -65,7 +65,17 @@ interface DualCameraStageProps {
   onHostBannerPosChange?: (pos: LowerThirdPosition) => void;
   guestBannerPos?: LowerThirdPosition;
   onGuestBannerPosChange?: (pos: LowerThirdPosition) => void;
+  watermarkPos?: LowerThirdPosition;
+  onWatermarkPosChange?: (pos: LowerThirdPosition) => void;
 }
+
+const DEFAULT_PIP_POSITION: PipPosition = {
+  x: 68,
+  y: 55,
+  size: 'medium',
+  scale: 32,
+  aspectRatio: '16:9'
+};
 
 export const DualCameraStage: React.FC<DualCameraStageProps> = ({
   layout,
@@ -99,17 +109,19 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
   audioLevel,
   splitRatio = 50,
   onSplitRatioChange,
-  pipPosition = { x: 68, y: 55, size: 'medium' },
+  pipPosition = DEFAULT_PIP_POSITION,
   onPipPositionChange,
   guestPan = { panX: 0, panY: 0, zoom: 1 },
   onGuestPanChange,
   onSwapPositions,
   primaryRole = 'guest',
   onPrimaryRoleChange,
-  hostBannerPos = { x: 3, y: 76 },
+  hostBannerPos = { x: 50, y: 76 },
   onHostBannerPosChange,
-  guestBannerPos = { x: 50, y: 76 },
-  onGuestBannerPosChange
+  guestBannerPos = { x: 3, y: 76 },
+  onGuestBannerPosChange,
+  watermarkPos = { x: 78, y: 3 },
+  onWatermarkPosChange
 }) => {
   const isGuestPrimary = primaryRole === 'guest';
   const containerRef = useRef<HTMLDivElement>(null);
@@ -119,6 +131,28 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
   const [isDraggingPip, setIsDraggingPip] = useState<boolean>(false);
   const [isDraggingHostBanner, setIsDraggingHostBanner] = useState<boolean>(false);
   const [isDraggingGuestBanner, setIsDraggingGuestBanner] = useState<boolean>(false);
+  const [isDraggingWatermark, setIsDraggingWatermark] = useState<boolean>(false);
+
+  // Drag Refs for Smooth 60fps Tracking
+  const watermarkDragRef = useRef<{
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+    containerWidth: number;
+    containerHeight: number;
+    boxWidth: number;
+    boxHeight: number;
+  }>({
+    startX: 0,
+    startY: 0,
+    initialX: 0,
+    initialY: 0,
+    containerWidth: 1,
+    containerHeight: 1,
+    boxWidth: 1,
+    boxHeight: 1
+  });
 
   // Banner Drag Storage Refs
   const hostBannerDragRef = useRef<{
@@ -182,8 +216,28 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
     boxHeight: 1
   });
 
-  // Calculate PiP dimensions based on size preset
-  const pipWidthPercent = pipPosition.size === 'small' ? 24 : pipPosition.size === 'large' ? 40 : 32;
+  // Calculate PiP dimensions based on custom scale or size preset
+  const pipWidthPercent = pipPosition.scale
+    ? Math.max(18, Math.min(65, pipPosition.scale))
+    : pipPosition.size === 'small'
+    ? 22
+    : pipPosition.size === 'large'
+    ? 42
+    : pipPosition.size === 'xlarge'
+    ? 52
+    : 32;
+
+  const pipAspectRatio = pipPosition.aspectRatio || '16:9';
+  const pipAspectRatioStyle: React.CSSProperties = {
+    aspectRatio:
+      pipAspectRatio === '4:3'
+        ? '4 / 3'
+        : pipAspectRatio === '1:1'
+        ? '1 / 1'
+        : pipAspectRatio === '9:16'
+        ? '9 / 16'
+        : '16 / 9'
+  };
 
   // Handler for PiP pointer down
   const handlePipPointerDown = useCallback(
@@ -396,6 +450,71 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
     [isDraggingGuestBanner]
   );
 
+  // Watermark / Logo Kemenag Pointer Down
+  const handleWatermarkPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!containerRef.current || !onWatermarkPosChange) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const boxRect = e.currentTarget.getBoundingClientRect();
+      watermarkDragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        initialX: watermarkPos.x,
+        initialY: watermarkPos.y,
+        containerWidth: containerRect.width,
+        containerHeight: containerRect.height,
+        boxWidth: boxRect.width,
+        boxHeight: boxRect.height
+      };
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // Safe fallback
+      }
+      setIsDraggingWatermark(true);
+    },
+    [watermarkPos, onWatermarkPosChange]
+  );
+
+  // Watermark Pointer Move
+  const handleWatermarkPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDraggingWatermark || !onWatermarkPosChange) return;
+      const { startX, startY, initialX, initialY, containerWidth, containerHeight, boxWidth, boxHeight } =
+        watermarkDragRef.current;
+      const deltaXPercent = ((e.clientX - startX) / containerWidth) * 100;
+      const deltaYPercent = ((e.clientY - startY) / containerHeight) * 100;
+      const boxWPercent = (boxWidth / containerWidth) * 100;
+      const boxHPercent = (boxHeight / containerHeight) * 100;
+      const maxAllowedX = Math.max(0, 99 - boxWPercent);
+      const maxAllowedY = Math.max(0, 91 - boxHPercent);
+      const nextX = Math.max(1, Math.min(maxAllowedX, initialX + deltaXPercent));
+      const nextY = Math.max(1, Math.min(maxAllowedY, initialY + deltaYPercent));
+      onWatermarkPosChange({
+        x: Math.round(nextX * 10) / 10,
+        y: Math.round(nextY * 10) / 10
+      });
+    },
+    [isDraggingWatermark, onWatermarkPosChange]
+  );
+
+  // Watermark Pointer Up
+  const handleWatermarkPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (isDraggingWatermark) {
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          // Safe fallback
+        }
+        setIsDraggingWatermark(false);
+      }
+    },
+    [isDraggingWatermark]
+  );
+
   return (
     <div
       ref={containerRef}
@@ -424,40 +543,53 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
         </div>
       )}
 
-      {/* TOP BROADCAST OVERLAYS (REC, Status, Watermark & Floating Position Action) */}
-      <div className="absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-30">
-        {/* Left: Recording & Status Badges */}
-        <div className="flex items-center gap-2 pointer-events-auto">
-          {recordingState === 'recording' && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-600 text-white text-xs font-mono font-black shadow-lg border border-red-400 animate-pulse">
-              <span className="w-2.5 h-2.5 rounded-full bg-white"></span>
-              <span>REC {formatTimer(recordDuration)}</span>
-            </div>
-          )}
+      {/* TOP BROADCAST OVERLAYS (REC & Status Badges) */}
+      <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-auto z-30">
+        {recordingState === 'recording' && (
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-600 text-white text-xs font-mono font-black shadow-lg border border-red-400 animate-pulse">
+            <span className="w-2.5 h-2.5 rounded-full bg-white"></span>
+            <span>REC {formatTimer(recordDuration)}</span>
+          </div>
+        )}
 
-          {recordingState === 'paused' && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-600 text-white text-xs font-mono font-bold shadow-lg border border-amber-400">
-              <Pause className="w-3 h-3" />
-              <span>PAUSED {formatTimer(recordDuration)}</span>
-            </div>
-          )}
+        {recordingState === 'paused' && (
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-600 text-white text-xs font-mono font-bold shadow-lg border border-amber-400">
+            <Pause className="w-3 h-3" />
+            <span>PAUSED {formatTimer(recordDuration)}</span>
+          </div>
+        )}
 
-          {isBroadcastingLive && (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#006837] text-white text-xs font-bold uppercase tracking-wider shadow-lg border border-emerald-400">
-              <Radio className="w-3 h-3 text-emerald-300 animate-ping" />
-              <span>ON-AIR LIVE</span>
-            </div>
-          )}
+        {isBroadcastingLive && (
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#006837] text-white text-xs font-bold uppercase tracking-wider shadow-lg border border-emerald-400">
+            <Radio className="w-3 h-3 text-emerald-300 animate-ping" />
+            <span>ON-AIR LIVE</span>
+          </div>
+        )}
+      </div>
 
-        </div>
-
-        {/* Right: Kemenag Official Watermark */}
-        {showWatermark && (
-          <div className="flex items-center gap-2 bg-black/75 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#D4AF37]/50 shadow-lg pointer-events-auto">
+      {/* Kemenag Official Watermark - Posisi dapat dipindahkan / digeser leluasa di layar monitor */}
+      {showWatermark && (
+        <div
+          onPointerDown={handleWatermarkPointerDown}
+          onPointerMove={handleWatermarkPointerMove}
+          onPointerUp={handleWatermarkPointerUp}
+          style={{
+            left: `${watermarkPos.x}%`,
+            top: `${watermarkPos.y}%`,
+            touchAction: 'none'
+          }}
+          className={`absolute z-35 group select-none transition-shadow rounded-xl pointer-events-auto ${
+            isDraggingWatermark
+              ? 'ring-2 ring-[#D4AF37] shadow-2xl cursor-grabbing scale-105'
+              : 'shadow-xl hover:ring-1 hover:ring-[#D4AF37]/60 cursor-grab'
+          }`}
+          title="Tahan & geser untuk memindahkan posisi Logo Kemenag pada layar monitor"
+        >
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#D4AF37]/50 shadow-lg">
             <img
               src="/logo-kemenag.svg"
-              alt="Kemenag"
-              className="w-5 h-5 object-contain"
+              alt="Logo Kemenag"
+              className="w-5 h-5 object-contain pointer-events-none"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src = '/logo-kemenag.png';
               }}
@@ -467,12 +599,18 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                 KUA GERUNG
               </div>
               <div className="text-[8px] font-medium text-emerald-300/80 leading-tight">
-                STUDIO DUAL CAM
+                KEMENAG LOBAR
               </div>
             </div>
+            <GripVertical className="w-3 h-3 text-white/30 group-hover:text-[#D4AF37] transition-colors ml-0.5" />
           </div>
-        )}
-      </div>
+          {isDraggingWatermark && (
+            <div className="absolute -top-6 left-0 bg-black/90 border border-[#D4AF37] px-2 py-0.5 rounded text-[8px] font-mono text-[#D4AF37] whitespace-nowrap z-40 shadow-md">
+              Logo: X: {Math.round(watermarkPos.x)}% &bull; Y: {Math.round(watermarkPos.y)}%
+            </div>
+          )}
+        </div>
+      )}
 
       {/* STAGE VIDEO LAYOUT VIEWS */}
       <div className="relative flex-1 w-full h-full min-h-[300px] overflow-hidden flex items-center justify-center">
@@ -516,7 +654,7 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                   <UserCheck className="w-3 h-3 text-[#D4AF37]" />
                 )}
                 <span className="text-[10px] sm:text-xs font-black text-white uppercase tracking-wider">
-                  {isGuestPrimary ? 'NARASUMBER &bull; UTAMA' : 'HOST &bull; KUA'}
+                  {isGuestPrimary ? 'KAMERA 1 • NARASUMBER' : 'KAMERA 1 • HOST'}
                 </span>
                 {audioLevel > 15 && (
                   <span className={`text-[9px] font-mono ${isGuestPrimary ? 'text-amber-300' : 'text-emerald-400'} animate-pulse`}>🎙️ AKTIF</span>
@@ -585,7 +723,7 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                   <User className="w-3 h-3 text-amber-300" />
                 )}
                 <span className="text-[10px] sm:text-xs font-black text-white uppercase tracking-wider">
-                  {isGuestPrimary ? 'HOST &bull; KAMERA 2' : 'NARASUMBER'}
+                  {isGuestPrimary ? 'KAMERA 2 • HOST' : 'KAMERA 2 • NARASUMBER'}
                 </span>
                 {audioLevel > 15 && (
                   <span className={`text-[9px] font-mono ${isGuestPrimary ? 'text-emerald-400' : 'text-amber-300'} animate-pulse`}>🎙️ AKTIF</span>
@@ -641,9 +779,10 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                 left: `${pipPosition.x}%`,
                 top: `${pipPosition.y}%`,
                 width: `${pipWidthPercent}%`,
-                touchAction: 'none'
+                touchAction: 'none',
+                ...pipAspectRatioStyle
               }}
-              className={`absolute aspect-video bg-black rounded-xl overflow-hidden border-2 z-30 group select-none transition-shadow ${
+              className={`absolute bg-black rounded-xl overflow-hidden border-2 z-30 group select-none transition-shadow ${
                 isDraggingPip
                   ? 'border-amber-400 ring-4 ring-amber-500/40 shadow-2xl cursor-grabbing'
                   : isGuestPrimary
@@ -652,19 +791,47 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
               }`}
               title="Tahan & geser untuk memindahkan posisi kamera kedua ke mana saja"
             >
-              {/* PiP Drag Handle Header Banner - Shows smoothly on hover */}
-              <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/85 via-black/50 to-transparent px-2 py-1.5 flex items-center justify-between text-white pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+              {/* PiP Drag Handle Header Banner - Shows smoothly on hover with Aspect Ratio Controls */}
+              <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/90 via-black/70 to-transparent px-2 py-1.5 flex items-center justify-between text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                 <div className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold text-amber-300 truncate">
                   <Move className="w-2.5 h-2.5 text-amber-400 shrink-0" />
                   <span className="truncate">
                     {isGuestPrimary
-                      ? `🎙️ ${hostProfile.name.slice(0, 14)}`
-                      : `👤 ${guestProfile.name.slice(0, 14)}`}
+                      ? `HOST`
+                      : `NARASUMBER`}
+                  </span>
+                  <span className="text-[8px] px-1 py-0.2 rounded bg-emerald-500/30 text-emerald-300 border border-emerald-400/40 font-mono">
+                    {pipAspectRatio}
                   </span>
                 </div>
-                <div className="flex items-center gap-0.5 text-[8px] font-mono bg-black/70 px-1.5 py-0.5 rounded text-[#D4AF37] border border-white/15 shrink-0">
-                  <GripVertical className="w-2.5 h-2.5" />
-                  <span>Geser Posisi</span>
+
+                {/* Quick Ratio Changer directly on PiP Box */}
+                <div className="flex items-center gap-1">
+                  <div className="flex items-center bg-black/80 rounded border border-white/20 p-0.5 text-[8px] font-bold">
+                    {(['16:9', '4:3', '1:1', '9:16'] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPipPositionChange?.({ ...pipPosition, aspectRatio: r });
+                        }}
+                        className={`px-1 py-0.5 rounded cursor-pointer transition-colors ${
+                          pipAspectRatio === r
+                            ? 'bg-emerald-500 text-black font-extrabold'
+                            : 'text-white/70 hover:text-white hover:bg-white/20'
+                        }`}
+                        title={`Ubah format rasio ke ${r}`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-0.5 text-[8px] font-mono bg-black/70 px-1 py-0.5 rounded text-[#D4AF37] border border-white/15 shrink-0 hidden sm:flex">
+                    <GripVertical className="w-2.5 h-2.5" />
+                    <span>Geser</span>
+                  </div>
                 </div>
               </div>
 
@@ -696,6 +863,9 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                   <Move className="w-5 h-5 text-amber-300 animate-bounce mb-1" />
                   <span className="text-[10px] font-mono font-bold text-amber-300">
                     X: {Math.round(pipPosition.x)}% &bull; Y: {Math.round(pipPosition.y)}%
+                  </span>
+                  <span className="text-[9px] font-mono font-bold text-emerald-300">
+                    Rasio: {pipAspectRatio} &bull; Ukuran: {Math.round(pipWidthPercent)}%
                   </span>
                   <span className="text-[9px] text-white/80">Lepas mouse untuk meletakkan</span>
                 </div>
@@ -747,7 +917,7 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
         {/* ======================================================== */}
         {showLowerThird && (
           <>
-            {/* HOST (Tuan Rumah) BANNER - Draggable */}
+            {/* HOST (Tuan Rumah) BANNER - Draggable Tanpa Latar Hitam */}
             {(layout === 'pip' || layout === 'split' || layout === 'solo-host') && (
               <div
                 onPointerDown={handleHostBannerPointerDown}
@@ -758,33 +928,33 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                   top: `${hostBannerPos.y}%`,
                   touchAction: 'none'
                 }}
-                className={`absolute z-35 group select-none transition-shadow rounded-xl ${
+                className={`absolute z-35 group select-none rounded-xl transition-all ${
                   isDraggingHostBanner
-                    ? 'ring-2 ring-emerald-400 shadow-2xl cursor-grabbing scale-[1.02]'
-                    : 'shadow-xl hover:ring-1 hover:ring-emerald-400/50 cursor-grab'
+                    ? 'ring-2 ring-emerald-400 bg-emerald-950/30 cursor-grabbing scale-[1.02]'
+                    : 'hover:ring-1 hover:ring-emerald-400/40 hover:bg-black/20 cursor-grab'
                 }`}
                 title="Tahan & geser untuk memindahkan posisi nama Host"
               >
-                <div className="inline-flex flex-col bg-gradient-to-r from-black/95 via-[#0a160f]/95 to-black/90 backdrop-blur-md border-l-4 border-emerald-500 pl-3 pr-3.5 py-1.5 rounded-r-xl border-y border-r border-white/15 shadow-2xl">
+                <div className="inline-flex flex-col pl-2.5 pr-2 py-1 select-none filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                   <div>
-                    <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5">
-                      <span className="text-emerald-400 text-[10px]">🎙️ HOST:</span>
+                    <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5 [text-shadow:_0_1px_4px_rgb(0_0_0_/_95%),_0_2px_8px_rgb(0_0_0_/_90%)]">
+                      <span className="text-emerald-400 text-[10px] font-extrabold [text-shadow:_0_1px_3px_rgb(0_0_0_/_100%)]">🎙️ HOST:</span>
                       <span className="truncate">{hostProfile.name}</span>
                     </div>
-                    <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-semibold tracking-wide truncate">
+                    <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-bold tracking-wide truncate [text-shadow:_0_1px_3px_rgb(0_0_0_/_95%),_0_2px_6px_rgb(0_0_0_/_90%)]">
                       {hostProfile.title}
                     </div>
                   </div>
 
                   {/* Hari, Tanggal, Bulan, Tahun & Waktu Tepat di Bawah Host */}
-                  <div className="mt-1 pt-1 border-t border-white/15 flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[9px] sm:text-[10px] text-white/90">
+                  <div className="mt-1 pt-0.5 flex items-center flex-wrap gap-x-2 gap-y-0.5 text-[9px] sm:text-[10px] text-white/95 [text-shadow:_0_1px_3px_rgb(0_0_0_/_95%)]">
                     <div className="flex items-center gap-1 text-[#D4AF37] font-bold uppercase tracking-wider">
-                      <Calendar className="w-3 h-3 text-[#D4AF37] shrink-0" />
+                      <Calendar className="w-3 h-3 text-[#D4AF37] shrink-0 drop-shadow" />
                       <span>{indonesianDate.dayName}, {indonesianDate.dateNum} {indonesianDate.monthName} {indonesianDate.year}</span>
                     </div>
-                    <div className="flex items-center gap-1 text-emerald-300 font-mono text-[9px] pl-1.5 border-l border-white/25">
-                      <Clock className="w-2.5 h-2.5 text-[#D4AF37] shrink-0" />
-                      <span>{indonesianDate.timeString} WITA</span>
+                    <div className="flex items-center gap-1 text-emerald-300 font-mono text-[9px] pl-1.5 border-l border-white/40">
+                      <Clock className="w-2.5 h-2.5 text-[#D4AF37] shrink-0 drop-shadow" />
+                      <span>{indonesianDate.timeString.includes('WITA') ? indonesianDate.timeString : `${indonesianDate.timeString} WITA`}</span>
                     </div>
                   </div>
                 </div>
@@ -796,7 +966,7 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
               </div>
             )}
 
-            {/* NARASUMBER (Tamu Undangan) BANNER - Draggable */}
+            {/* NARASUMBER (Tamu Undangan) BANNER - Draggable Tanpa Latar Hitam */}
             {(layout === 'pip' || layout === 'split' || layout === 'solo-guest') && (
               <div
                 onPointerDown={handleGuestBannerPointerDown}
@@ -807,20 +977,20 @@ export const DualCameraStage: React.FC<DualCameraStageProps> = ({
                   top: `${guestBannerPos.y}%`,
                   touchAction: 'none'
                 }}
-                className={`absolute z-35 group select-none transition-shadow rounded-xl ${
+                className={`absolute z-35 group select-none rounded-xl transition-all ${
                   isDraggingGuestBanner
-                    ? 'ring-2 ring-amber-400 shadow-2xl cursor-grabbing scale-[1.02]'
-                    : 'shadow-xl hover:ring-1 hover:ring-amber-400/50 cursor-grab'
+                    ? 'ring-2 ring-amber-400 bg-amber-950/30 cursor-grabbing scale-[1.02]'
+                    : 'hover:ring-1 hover:ring-amber-400/40 hover:bg-black/20 cursor-grab'
                 }`}
                 title="Tahan & geser untuk memindahkan posisi nama Narasumber"
               >
-                <div className="inline-flex flex-col bg-gradient-to-r from-black/95 via-[#1a140d]/95 to-black/90 backdrop-blur-md border-l-4 border-[#D4AF37] pl-3 pr-3.5 py-1.5 rounded-r-xl border-y border-r border-white/15 shadow-2xl">
+                <div className="inline-flex flex-col pl-2.5 pr-2 py-1 select-none filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                   <div>
-                    <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5">
-                      <span className="text-amber-400 text-[10px]">👤 TAMU:</span>
+                    <div className="text-[11px] sm:text-xs font-black text-white tracking-wide uppercase flex items-center gap-1.5 [text-shadow:_0_1px_4px_rgb(0_0_0_/_95%),_0_2px_8px_rgb(0_0_0_/_90%)]">
+                      <span className="text-amber-400 text-[10px] font-extrabold [text-shadow:_0_1px_3px_rgb(0_0_0_/_100%)]">👤 NARASUMBER:</span>
                       <span className="truncate">{guestProfile.name}</span>
                     </div>
-                    <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-semibold tracking-wide truncate">
+                    <div className="text-[9px] sm:text-[10px] text-[#D4AF37] font-bold tracking-wide truncate [text-shadow:_0_1px_3px_rgb(0_0_0_/_95%),_0_2px_6px_rgb(0_0_0_/_90%)]">
                       {guestProfile.title}
                     </div>
                   </div>
